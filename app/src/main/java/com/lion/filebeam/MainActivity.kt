@@ -50,12 +50,12 @@ fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "Telefon â TV hÄ±zlÄ± dosya aktarÄ±mÄ±",
+                "Telefon ↔ TV hızlı dosya aktarımı",
                 fontSize = 16.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(36.dp))
-            ModeCard("GÃ¶nder (Telefon)", "Bu cihazdan dosya gÃ¶nder", Icons.Filled.Send, onSend)
+            ModeCard("Gönder (Telefon)", "Bu cihazdan dosya gönder", Icons.Filled.Send, onSend)
             Spacer(Modifier.height(16.dp))
             ModeCard("Al (TV / Tablet)", "Bu cihazda dosya al", Icons.Filled.Tv, onReceive)
         }

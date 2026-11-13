@@ -25,7 +25,6 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.lion.filebeam.Discovery
 import com.lion.filebeam.TransferClient
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -43,7 +42,6 @@ fun SenderScreen(onBack: () -> Unit) {
     var doneMsg by remember { mutableStateOf<String?>(null) }
     var manualIp by remember { mutableStateOf("") }
     var manualPin by remember { mutableStateOf("") }
-    var sendJob by remember { mutableStateOf<Job?>(null) }
 
     val listenJob = remember { mutableStateOf<Job?>(null) }
     DisposableEffect(Unit) {
@@ -86,7 +84,7 @@ fun SenderScreen(onBack: () -> Unit) {
         sending = true
         error = null
         doneMsg = null
-        sendJob = scope.launch {
+        scope.launch {
             try {
                 TransferClient.send(context, dev.ip, dev.port, dev.pin.ifBlank { manualPin }, picked) { p -> progress = p }
                 doneMsg = picked.size.toString() + " dosya gönderildi 🎉"
@@ -210,7 +208,7 @@ fun SenderScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 )
                 Text(
-                    formatSize(p.bytes) + " / " + formatSize(p.total) + "  •  " + formatSpeed(p.speedBps),
+                    formatSize(p.bytes) + " / " + (if (p.total >= 0) formatSize(p.total) else "Bilinmiyor") + "  •  " + formatSpeed(p.speedBps),
                     fontSize = 13.sp,
                 )
             }

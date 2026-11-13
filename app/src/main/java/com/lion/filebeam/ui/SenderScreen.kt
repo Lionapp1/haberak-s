@@ -88,7 +88,7 @@ fun SenderScreen(onBack: () -> Unit) {
         doneMsg = null
         scope.launch {
             try {
-                TransferClient.send(context, dev.ip, dev.port, dev.pin.ifBlank { manualPin }, picked) { p -> progress = p }
+                TransferClient.send(context, dev.ip, dev.port, dev.pin.ifBlank { manualPin }, picked) { p -> scope.launch { progress = p } }
                 doneMsg = picked.size.toString() + " dosya gönderildi 🎉"
                 picked = emptyList()
             } catch (e: Exception) {

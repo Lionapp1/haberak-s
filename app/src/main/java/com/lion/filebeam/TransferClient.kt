@@ -108,7 +108,7 @@ object TransferClient {
     private fun querySize(resolver: ContentResolver, uri: Uri): Long =
         resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
             val index = cursor.getColumnIndex(OpenableColumns.SIZE)
-            if (index >= 0 && cursor.moveToFirst()) cursor.getLong(index).takeIf { it >= 0L } ?: -1L
+            if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) cursor.getLong(index).takeIf { it >= 0L } ?: -1L
             else -1L
         } ?: -1L
 }

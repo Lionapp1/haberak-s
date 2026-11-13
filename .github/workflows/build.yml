@@ -96,6 +96,15 @@ jobs:
             echo "KEY_PASSWORD=$SIGNING_KEY_PASSWORD"
           } > keystore.properties
 
+      - name: Install Android build tools
+        if: steps.signing.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "build-tools;35.0.0"
+          echo "$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_PATH"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
+
       - name: Build and verify signed release APK
         if: steps.signing.outputs.available == 'true'
         shell: bash

@@ -58,7 +58,7 @@ object Discovery {
     fun localIp(): String = activeIpv4().firstOrNull()?.second?.hostAddress ?: ""
 
     /** TV: announce device details without exposing the pairing PIN on the LAN. */
-    suspend fun broadcastLoop(port: Int, pin: String) = withContext(Dispatchers.IO) {
+    suspend fun broadcastLoop(port: Int) = withContext(Dispatchers.IO) {
         DatagramSocket().use { socket ->
             socket.broadcast = true
             val name = (Build.MODEL ?: "Android TV").replace("|", " ").take(80)

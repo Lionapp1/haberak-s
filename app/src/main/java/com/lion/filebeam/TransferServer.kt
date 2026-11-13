@@ -2,6 +2,8 @@ package com.lion.filebeam
 
 import android.content.Context
 import android.util.Base64
+import android.os.Handler
+import android.os.Looper
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.InetSocketAddress
@@ -18,6 +20,7 @@ class TransferServer(
     private val onFileDone: (name: String) -> Unit,
     private val onError: (String) -> Unit,
 ) {
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var serverSocket: ServerSocket? = null
     @Volatile private var running = false
 
@@ -34,7 +37,7 @@ class TransferServer(
                     val client = ss.accept()
                     Thread({ handle(client) }, "FileBeam-client").start()
                 } catch (e: Exception) {
-                    if (running) onError(e.message ?: "Sunucu hatası")
+                    if (running) mainHandler.post { onError(e.message ?: "Sunucu hatası") }
                 }
             }
         }, "FileBeam-server").start()
@@ -87,7 +90,7 @@ class TransferServer(
 
             response.write("OK\n".toByteArray(Charsets.US_ASCII))
             response.flush()
-            onFileStart(name, expectedSize)
+            mainHandler.post { onFileStart(name, expectedSize) }
 
             val buffer = ByteArray(64 * 1024)
             var received = 0L
@@ -111,7 +114,8 @@ class TransferServer(
                     received += count
                     val now = System.currentTimeMillis()
                     if (now - lastTime >= 300) {
-                        onProgress(name, received, expectedSize, (received - lastBytes) * 1000 / (now - lastTime))
+                        val speed = (received - lastBytes) * 1000 / (now - lastTime)
+                        mainHandler.post { onProgress(name, received, expectedSize, speed) }
                         lastBytes = received
                         lastTime = now
                     }
@@ -123,12 +127,14 @@ class TransferServer(
             savedUri = null
             response.write("DONE\n".toByteArray(Charsets.US_ASCII))
             response.flush()
-            onProgress(name, received, expectedSize, 0L)
-            onFileDone(name)
+            mainHandler.post {
+                onProgress(name, received, expectedSize, 0L)
+                onFileDone(name)
+            }
         } catch (e: Exception) {
             runCatching { output?.close() }
             savedUri?.let { FileSaver.delete(context, it) }
-            onError(e.message ?: "Aktarım hatası")
+            mainHandler.post { onError(e.message ?: "Aktarım hatası") }
         } finally {
             runCatching { socket.close() }
         }

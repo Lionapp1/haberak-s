@@ -38,6 +38,7 @@ object TransferClient {
                 Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
             )
 
+            val source = resolver.openInputStream(uri) ?: throw IOException("Dosya açılamadı")
             val conn = Socket()
             try {
                 conn.tcpNoDelay = true
@@ -55,7 +56,6 @@ object TransferClient {
                     else -> throw IOException("TV bağlantıyı reddetti")
                 }
 
-                val source = resolver.openInputStream(uri) ?: throw IOException("Dosya açılamadı")
                 source.use { input ->
                     val buffer = ByteArray(64 * 1024)
                     var sent = 0L
@@ -92,6 +92,7 @@ object TransferClient {
                 if (reader.readLine() != "DONE") throw IOException("TV dosyanın tamamlandığını onaylamadı")
                 onProgress(Progress(name, if (size >= 0L) size else 0L, size, 0L))
             } finally {
+                runCatching { source.close() }
                 runCatching { conn.close() }
             }
         }

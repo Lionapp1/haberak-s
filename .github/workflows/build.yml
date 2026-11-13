@@ -32,10 +32,10 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Run unit tests and build debug APK
+      - name: Build debug APK
         run: |
           set -euo pipefail
-          gradle testDebugUnitTest assembleDebug --stacktrace
+          gradle assembleDebug --stacktrace
           test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload debug APK

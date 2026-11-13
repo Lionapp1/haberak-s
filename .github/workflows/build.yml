@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -24,7 +24,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.9'
 
       - name: Prepare signing keystore
         env:
@@ -38,7 +38,7 @@ jobs:
             echo "Gerçek release anahtarı kullanılıyor."
           else
             echo "Secret yok: geçici imza anahtarı oluşturuluyor (yalnızca test için)."
-            keytool -genkey -v -keystore "$GITHUB_WORKSPACE/release.keystore" \
+            keytool -genkeypair -v -keystore "$GITHUB_WORKSPACE/release.keystore" \
               -alias haberakisi -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass haberakisi -keypass haberakisi \
               -dname "CN=HaberAkisi, OU=Dev, O=Lion, C=TR"
@@ -51,7 +51,30 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build release APK
-        run: gradle assembleRelease --no-daemon
+        run: |
+          set -o pipefail
+          gradle assembleRelease --stacktrace --no-daemon 2>&1 | tee build.log
+
+      - name: Surface errors
+        if: failure()
+        run: |
+          if [ -f build.log ]; then
+            grep -n -i -E "error:|e: |FAILURE:|Caused by:|What went wrong" build.log | head -40 > errs.txt || true
+            while IFS= read -r line; do
+              echo "::error::${line:0:400}"
+            done < errs.txt
+            echo "---- SON 60 SATIR ----"
+            tail -60 build.log
+          fi
+
+      - name: Upload build reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: |
+            build.log
+            app/build/reports/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

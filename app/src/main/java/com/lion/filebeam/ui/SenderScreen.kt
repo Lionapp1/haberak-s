@@ -2,6 +2,7 @@
 
 package com.lion.filebeam.ui
 
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,6 +35,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SenderScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val isTv = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
     val scope = rememberCoroutineScope()
 
     val devices = remember { mutableStateListOf<Discovery.Beacon>() }
@@ -106,6 +108,7 @@ fun SenderScreen(onBack: () -> Unit) {
                 title = { Text("Gönder", fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") } },
                 actions = {
+                    if (!isTv) {
                     IconButton(onClick = {
                         scanLauncher.launch(
                             ScanOptions()
@@ -115,22 +118,23 @@ fun SenderScreen(onBack: () -> Unit) {
                                 .setOrientationLocked(true)
                         )
                     }) { Icon(Icons.Filled.QrCodeScanner, "QR ile bağlan") }
+                    }
                 },
             )
         }
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            Modifier.fillMaxSize().padding(padding).padding(horizontal = if (isTv) 36.dp else 16.dp, vertical = if (isTv) 24.dp else 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Ağdaki cihazlar", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.Start))
+            Text("Ağdaki cihazlar", fontSize = if (isTv) 24.sp else 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.Start))
             Spacer(Modifier.height(8.dp))
 
             if (devices.isEmpty()) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("TV'de FileBeam > Al ekranını aç", fontSize = 14.sp)
-                        Text("Cihazlar burada otomatik listelenecek…", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("TV'de FileBeam > Al ekranını aç", fontSize = if (isTv) 20.sp else 14.sp)
+                        Text("Cihazlar burada otomatik listelenecek…", fontSize = if (isTv) 16.sp else 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else {
@@ -144,12 +148,12 @@ fun SenderScreen(onBack: () -> Unit) {
                                 CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                             else CardDefaults.cardColors(),
                         ) {
-                            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.padding(if (isTv) 22.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text("📺", fontSize = 20.sp)
                                 Spacer(Modifier.width(12.dp))
                                 Column {
-                                    Text(d.name, fontWeight = FontWeight.SemiBold)
-                                    Text(d.ip + ":" + d.port, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(d.name, fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 20.sp else 14.sp)
+                                    Text(d.ip + ":" + d.port, fontSize = if (isTv) 15.sp else 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -190,18 +194,18 @@ fun SenderScreen(onBack: () -> Unit) {
             Button(
                 onClick = { picker.launch(arrayOf("*/*")) },
                 enabled = !sending,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                modifier = Modifier.fillMaxWidth().height(if (isTv) 68.dp else 52.dp),
             ) { Text(if (picked.isEmpty()) "Dosya Seç" else picked.size.toString() + " dosya seçildi — değiştir") }
 
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = { startSend() },
                 enabled = !sending && selected != null && picked.isNotEmpty() && (selected?.pin?.length == 6 || manualPin.length == 6),
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier.fillMaxWidth().height(if (isTv) 76.dp else 56.dp),
             ) {
                 Icon(Icons.Filled.Send, null)
                 Spacer(Modifier.width(8.dp))
-                Text(if (selected == null) "Önce cihaz seç" else if (selected?.pin?.length != 6 && manualPin.length != 6) "TV PIN kodunu gir" else "GÖNDER", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(if (selected == null) "Önce cihaz seç" else if (selected?.pin?.length != 6 && manualPin.length != 6) "TV PIN kodunu gir" else "GÖNDER", fontSize = if (isTv) 21.sp else 16.sp, fontWeight = FontWeight.Bold)
             }
 
             progress?.let { p ->

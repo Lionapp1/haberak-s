@@ -101,6 +101,7 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           accept-android-sdk-licenses: true
+          packages: platform-tools
 
       - name: Install Android build tools
         if: steps.signing.outputs.available == 'true'

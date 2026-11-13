@@ -2,88 +2,72 @@ name: Build & Sign APK
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
+    branches: [ main ]
   workflow_dispatch:
-  release:
-    types: [ created ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.9'
 
       - name: Prepare signing keystore
         env:
-          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/release.keystore"
-            echo "Gerçek release anahtarı kullanılıyor."
+          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
+            {
+              echo "KEYSTORE_FILE=/tmp/release.keystore"
+              echo "KEYSTORE_PASSWORD=$SIGNING_KEYSTORE_PASSWORD"
+              echo "KEY_ALIAS=$SIGNING_KEY_ALIAS"
+              echo "KEY_PASSWORD=$SIGNING_KEY_PASSWORD"
+            } > keystore.properties
           else
-            echo "Secret yok: geçici imza anahtarı oluşturuluyor (yalnızca test için)."
-            keytool -genkeypair -v -keystore "$GITHUB_WORKSPACE/release.keystore" \
-              -alias haberakisi -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass haberakisi -keypass haberakisi \
-              -dname "CN=HaberAkisi, OU=Dev, O=Lion, C=TR"
+            echo "::warning::Ä°mza secret'larÄ± yok â geÃ§ici keystore Ã¼retiliyor."
+            keytool -genkeypair -v -keystore /tmp/release.keystore -alias filebeam \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass filebeam123 -keypass filebeam123 \
+              -dname "CN=FileBeam, OU=Lion, O=Lion, L=Istanbul, S=Istanbul, C=TR"
+            {
+              echo "KEYSTORE_FILE=/tmp/release.keystore"
+              echo "KEYSTORE_PASSWORD=filebeam123"
+              echo "KEY_ALIAS=filebeam"
+              echo "KEY_PASSWORD=filebeam123"
+            } > keystore.properties
           fi
-          echo "KEYSTORE_FILE=$GITHUB_WORKSPACE/release.keystore" >> "$GITHUB_ENV"
-          {
-            echo "KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD:-haberakisi}"
-            echo "KEY_ALIAS=${KEY_ALIAS:-haberakisi}"
-            echo "KEY_PASSWORD=${KEY_PASSWORD:-haberakisi}"
-          } >> "$GITHUB_ENV"
 
       - name: Build release APK
         run: |
-          set -o pipefail
-          gradle assembleRelease --stacktrace --no-daemon 2>&1 | tee build.log
+          gradle assembleRelease --stacktrace 2>&1 | tee build.log
+          grep -E "^e: |error:" build.log | head -50 | while IFS= read -r l; do echo "::error::$l"; done
+          test -f app/build/outputs/apk/release/app-release.apk
 
-      - name: Surface errors
-        if: failure()
-        run: |
-          if [ -f build.log ]; then
-            grep -n -i -E "error:|e: |FAILURE:|Caused by:|What went wrong" build.log | head -40 > errs.txt || true
-            while IFS= read -r line; do
-              echo "::error::${line:0:400}"
-            done < errs.txt
-            echo "---- SON 60 SATIR ----"
-            tail -60 build.log
-          fi
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FileBeam-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
 
-      - name: Upload build reports on failure
+      - name: Upload reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: build-reports
           path: |
-            build.log
             app/build/reports/
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: HaberAkisi-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
-
-      - name: Attach APK to release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: app/build/outputs/apk/release/app-release.apk
+            build.log

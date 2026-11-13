@@ -7,7 +7,6 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// İmza: önce CI ortam değişkenleri, yoksa local keystore.properties
 val keystoreProps = Properties().apply {
     val f = rootProject.file("keystore.properties")
     if (f.exists()) FileInputStream(f).use { load(it) }
@@ -15,15 +14,15 @@ val keystoreProps = Properties().apply {
 fun prop(name: String): String? = System.getenv(name) ?: keystoreProps.getProperty(name)
 
 android {
-    namespace = "com.lion.haberakisi"
+    namespace = "com.lion.filebeam"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.lion.haberakisi"
+        applicationId = "com.lion.filebeam"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "2.0.0"
     }
 
     signingConfigs {
@@ -60,12 +59,12 @@ dependencies {
     implementation(composeBom)
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
     implementation("androidx.activity:activity-compose:1.9.2")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

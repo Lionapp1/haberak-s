@@ -1,1 +1,3 @@
-# HaberAkisi proguard kuralları (varsayılanlar yeterli)
+# FileBeam proguard
+-keep class com.google.zxing.** { *; }
+-keep class com.journeyapps.barcodescanner.** { *; }

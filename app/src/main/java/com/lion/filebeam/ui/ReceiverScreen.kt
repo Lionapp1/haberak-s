@@ -69,7 +69,7 @@ fun ReceiverScreen(onBack: () -> Unit) {
         )
         port = server.start()
         serverRef = server
-        Discovery.broadcastLoop(port, pin)
+        Discovery.broadcastLoop(port)
     }
 
     Scaffold(

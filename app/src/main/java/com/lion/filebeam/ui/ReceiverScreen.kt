@@ -56,14 +56,14 @@ fun ReceiverScreen(onBack: () -> Unit) {
             context, pin,
             onFileStart = { name, size ->
                 incoming = TransferClient.Progress(name, 0, size, 0)
-                log.add(0, "â¬  " + name)
+                log.add(0, "⬇  " + name)
             },
             onProgress = { _, bytes, total, speed ->
-                incoming = TransferClient.Progress("aktarÄ±m", bytes, total, speed)
+                incoming = TransferClient.Progress("aktarım", bytes, total, speed)
             },
             onFileDone = { name ->
                 incoming = null
-                log.add(0, "â  " + name + " alÄ±ndÄ±")
+                log.add(0, "✅  " + name + " alındı")
             },
             onError = { e -> error = e },
         )
@@ -75,7 +75,7 @@ fun ReceiverScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("AlÄ±cÄ± â " + (android.os.Build.MODEL ?: "TV"), fontWeight = FontWeight.Bold) },
+                title = { Text("Alıcı — " + (android.os.Build.MODEL ?: "TV"), fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") } },
             )
         }
@@ -84,10 +84,10 @@ fun ReceiverScreen(onBack: () -> Unit) {
             Modifier.fillMaxSize().padding(padding).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Bu cihaz hazÄ±r ðº", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("Bu cihaz hazır 📺", fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Telefonda FileBeam > GÃ¶nder > bu cihazÄ± seÃ§",
+                "Telefonda FileBeam > Gönder > bu cihazı seç",
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -115,14 +115,14 @@ fun ReceiverScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 )
                 Text(
-                    formatSize(p.bytes) + " / " + formatSize(p.total) + "  â¢  " + formatSpeed(p.speedBps),
+                    formatSize(p.bytes) + " / " + formatSize(p.total) + "  •  " + formatSpeed(p.speedBps),
                     fontSize = 13.sp,
                 )
             }
 
             error?.let {
                 Spacer(Modifier.height(8.dp))
-                Text("â  " + it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                Text("⚠ " + it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
             }
 
             if (log.isNotEmpty()) {

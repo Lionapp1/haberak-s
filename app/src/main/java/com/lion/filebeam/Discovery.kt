@@ -102,7 +102,7 @@ object Discovery {
                             val port = parts[3].toIntOrNull() ?: continue
                             val ip = parts[2]
                             if (port in 1..65535 && ip.matches(Regex("[0-9.]{7,15}"))) {
-                                onBeacon(Beacon(parts[1].take(80), ip, port))
+                                withContext(Dispatchers.Main) { onBeacon(Beacon(parts[1].take(80), ip, port)) }
                             }
                         }
                     } catch (_: SocketTimeoutException) {

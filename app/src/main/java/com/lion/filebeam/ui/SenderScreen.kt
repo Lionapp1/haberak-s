@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.journeyapps.barcodescanner.ScanContract
@@ -165,7 +167,8 @@ fun SenderScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = manualPin,
-                onValueChange = { manualPin = it.take(6) },
+                onValueChange = { manualPin = it.filter(Char::isDigit).take(6) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 label = { Text("TV'deki PIN (6 rakam)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),

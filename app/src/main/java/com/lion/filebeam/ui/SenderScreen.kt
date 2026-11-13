@@ -10,17 +10,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -37,7 +40,6 @@ fun SenderScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val isTv = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
     val scope = rememberCoroutineScope()
-
     val devices = remember { mutableStateListOf<Discovery.Beacon>() }
     var selected by remember { mutableStateOf<Discovery.Beacon?>(null) }
     var picked by remember { mutableStateOf<List<Uri>>(emptyList()) }
@@ -47,8 +49,8 @@ fun SenderScreen(onBack: () -> Unit) {
     var doneMsg by remember { mutableStateOf<String?>(null) }
     var manualIp by remember { mutableStateOf("") }
     var manualPin by remember { mutableStateOf("") }
-
     val listenJob = remember { mutableStateOf<Job?>(null) }
+
     DisposableEffect(Unit) {
         listenJob.value = scope.launch {
             Discovery.listen(context) { b ->
@@ -59,7 +61,6 @@ fun SenderScreen(onBack: () -> Unit) {
         }
         onDispose { listenJob.value?.cancel() }
     }
-
     LaunchedEffect(Unit) {
         while (true) {
             delay(3000)
@@ -68,11 +69,9 @@ fun SenderScreen(onBack: () -> Unit) {
             if (selected?.let { it.seen < cutoff && it.pin.isBlank() } == true) selected = null
         }
     }
-
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
         if (it.isNotEmpty()) picked = it
     }
-
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         result.contents?.let { c ->
             Regex("filebeam://([0-9.]+):([0-9]+)#([0-9]+)").find(c)?.let { m ->
@@ -82,7 +81,6 @@ fun SenderScreen(onBack: () -> Unit) {
             } ?: run { error = "QR anlaşılamadı" }
         }
     }
-
     fun startSend() {
         val dev = selected ?: return
         if (picked.isEmpty()) return
@@ -91,8 +89,10 @@ fun SenderScreen(onBack: () -> Unit) {
         doneMsg = null
         scope.launch {
             try {
-                TransferClient.send(context, dev.ip, dev.port, dev.pin.ifBlank { manualPin }, picked) { p -> scope.launch { progress = p } }
-                doneMsg = picked.size.toString() + " dosya gönderildi 🎉"
+                TransferClient.send(context, dev.ip, dev.port, dev.pin.ifBlank { manualPin }, picked) { p ->
+                    scope.launch { progress = p }
+                }
+                doneMsg = picked.size.toString() + " dosya başarıyla gönderildi"
                 picked = emptyList()
             } catch (e: Exception) {
                 error = e.message ?: "Gönderilemedi"
@@ -105,130 +105,185 @@ fun SenderScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Gönder", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text("Dosya gönder", fontWeight = FontWeight.Bold)
+                        Text("Yakındaki cihaza aktar", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") } },
                 actions = {
                     if (!isTv) {
-                    IconButton(onClick = {
-                        scanLauncher.launch(
-                            ScanOptions()
-                                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                .setPrompt("TV ekranındaki QR kodu okut")
-                                .setBeepEnabled(false)
-                                .setOrientationLocked(true)
-                        )
-                    }) { Icon(Icons.Filled.QrCodeScanner, "QR ile bağlan") }
+                        IconButton(onClick = {
+                            scanLauncher.launch(
+                                ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                    .setPrompt("TV ekranındaki QR kodu okut")
+                                    .setBeepEnabled(false).setOrientationLocked(true)
+                            )
+                        }) { Icon(Icons.Filled.QrCodeScanner, "QR ile bağlan") }
                     }
                 },
             )
         }
     ) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = if (isTv) 36.dp else 16.dp, vertical = if (isTv) 24.dp else 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(
+                start = if (isTv) 40.dp else 16.dp,
+                end = if (isTv) 40.dp else 16.dp,
+                top = 12.dp,
+                bottom = 28.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text("Ağdaki cihazlar", fontSize = if (isTv) 24.sp else 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.Start))
-            Spacer(Modifier.height(8.dp))
-
-            if (devices.isEmpty()) {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("TV'de FileBeam > Al ekranını aç", fontSize = if (isTv) 20.sp else 14.sp)
-                        Text("Cihazlar burada otomatik listelenecek…", fontSize = if (isTv) 16.sp else 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("Nereye gönderelim?", fontSize = if (isTv) 27.sp else 21.sp, fontWeight = FontWeight.Bold)
+                    Text("Aynı Wi-Fi ağına bağlı cihazlar otomatik görünür.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = if (isTv) 17.sp else 13.sp)
                 }
-            } else {
-                LazyColumn(Modifier.weight(0.4f)) {
-                    items(devices) { d ->
-                        Card(
-                            Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable {
-                                selected = d; error = null; doneMsg = null
-                            },
-                            colors = if (selected?.ip == d.ip)
-                                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                            else CardDefaults.cardColors(),
-                        ) {
-                            Row(Modifier.padding(if (isTv) 22.dp else 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("📺", fontSize = 20.sp)
-                                Spacer(Modifier.width(12.dp))
-                                Column {
-                                    Text(d.name, fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 20.sp else 14.sp)
-                                    Text(d.ip + ":" + d.port, fontSize = if (isTv) 15.sp else 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            item {
+                SectionCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Tv, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(9.dp))
+                        Text("Cihazlar", fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 20.sp else 16.sp)
+                        Spacer(Modifier.weight(1f))
+                        Text(if (devices.isEmpty()) "Aranıyor…" else "${devices.size} bulundu", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    if (devices.isEmpty()) {
+                        Text("TV'de FileBeam uygulamasını açıp Al ekranına geç.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = if (isTv) 17.sp else 13.sp)
+                    } else {
+                        devices.forEach { d ->
+                            val active = selected?.ip == d.ip
+                            Surface(
+                                onClick = { selected = d; error = null; doneMsg = null },
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                            ) {
+                                Row(
+                                    Modifier.padding(if (isTv) 18.dp else 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(Icons.Filled.Tv, null, tint = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(d.name, fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 18.sp else 14.sp)
+                                        Text(d.ip + ":" + d.port, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    if (active) Icon(Icons.Filled.CheckCircle, "Seçildi", tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
                     }
                 }
             }
-
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = manualIp,
-                onValueChange = { manualIp = it },
-                label = { Text("IP (manuel: 192.168.1.x)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = manualPin,
-                onValueChange = { manualPin = it.filter(Char::isDigit).take(6) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                label = { Text("TV'deki PIN (6 rakam)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = {
-                    if (manualIp.isNotBlank() && manualPin.length == 6) {
-                        selected = Discovery.Beacon("Manuel bağlantı", manualIp.trim(), 47813, manualPin)
-                        error = null; doneMsg = null
+            item {
+                SectionCard {
+                    Text("Manuel bağlantı", fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 20.sp else 16.sp)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = manualIp,
+                        onValueChange = { manualIp = it },
+                        label = { Text("TV IP adresi") },
+                        placeholder = { Text("192.168.1.25") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(fontSize = if (isTv) 18.sp else 15.sp),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = manualPin,
+                        onValueChange = { manualPin = it.filter(Char::isDigit).take(6) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        label = { Text("6 haneli PIN") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(fontSize = if (isTv) 18.sp else 15.sp),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            if (manualIp.isNotBlank() && manualPin.length == 6) {
+                                selected = Discovery.Beacon("Manuel bağlantı", manualIp.trim(), 47813, manualPin)
+                                error = null
+                                doneMsg = null
+                            }
+                        },
+                        enabled = manualIp.isNotBlank() && manualPin.length == 6,
+                        modifier = Modifier.fillMaxWidth().height(if (isTv) 58.dp else 46.dp),
+                    ) { Text("Bu cihaza bağlan") }
+                }
+            }
+            item {
+                SectionCard {
+                    Text("Gönderilecek dosyalar", fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 20.sp else 16.sp)
+                    Spacer(Modifier.height(5.dp))
+                    Text(if (picked.isEmpty()) "Henüz dosya seçilmedi." else "${picked.size} dosya seçildi", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = if (isTv) 17.sp else 13.sp)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { picker.launch(arrayOf("*/*")) },
+                        enabled = !sending,
+                        modifier = Modifier.fillMaxWidth().height(if (isTv) 62.dp else 50.dp),
+                    ) { Text(if (picked.isEmpty()) "Dosya seç" else "Dosyaları değiştir") }
+                    Spacer(Modifier.height(9.dp))
+                    Button(
+                        onClick = { startSend() },
+                        enabled = !sending && selected != null && picked.isNotEmpty() && (selected?.pin?.length == 6 || manualPin.length == 6),
+                        modifier = Modifier.fillMaxWidth().height(if (isTv) 68.dp else 52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        if (sending) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.Filled.Send, null)
+                        Spacer(Modifier.width(9.dp))
+                        Text(if (sending) "Gönderiliyor…" else "Gönderimi başlat", fontWeight = FontWeight.Bold, fontSize = if (isTv) 19.sp else 15.sp)
                     }
-                },
-                modifier = Modifier.align(Alignment.End),
-            ) { Text("Bağlan") }
-
-            Spacer(Modifier.height(16.dp))
-
-            Button(
-                onClick = { picker.launch(arrayOf("*/*")) },
-                enabled = !sending,
-                modifier = Modifier.fillMaxWidth().height(if (isTv) 68.dp else 52.dp),
-            ) { Text(if (picked.isEmpty()) "Dosya Seç" else picked.size.toString() + " dosya seçildi — değiştir") }
-
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = { startSend() },
-                enabled = !sending && selected != null && picked.isNotEmpty() && (selected?.pin?.length == 6 || manualPin.length == 6),
-                modifier = Modifier.fillMaxWidth().height(if (isTv) 76.dp else 56.dp),
-            ) {
-                Icon(Icons.Filled.Send, null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (selected == null) "Önce cihaz seç" else if (selected?.pin?.length != 6 && manualPin.length != 6) "TV PIN kodunu gir" else "GÖNDER", fontSize = if (isTv) 21.sp else 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
-
-            progress?.let { p ->
-                Spacer(Modifier.height(16.dp))
-                Text(p.fileName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                LinearProgressIndicator(
-                    progress = { if (p.total > 0) p.bytes.toFloat() / p.total else 0f },
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                )
-                Text(
-                    formatSize(p.bytes) + " / " + (if (p.total >= 0) formatSize(p.total) else "Bilinmiyor") + "  •  " + formatSpeed(p.speedBps),
-                    fontSize = 13.sp,
-                )
+            if (progress != null) {
+                item {
+                    SectionCard {
+                        val p = progress!!
+                        Text(p.fileName, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                        LinearProgressIndicator(
+                            progress = { if (p.total > 0) (p.bytes.toFloat() / p.total).coerceIn(0f, 1f) else 0f },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                        )
+                        Text(formatSize(p.bytes) + " / " + (if (p.total >= 0) formatSize(p.total) else "Bilinmiyor") + " · " + formatSpeed(p.speedBps), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
             }
-
-            doneMsg?.let {
-                Spacer(Modifier.height(8.dp))
-                Text(it, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            }
-            error?.let {
-                Spacer(Modifier.height(8.dp))
-                Text("⚠ " + it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
-            }
+            if (doneMsg != null) item { StatusMessage(doneMsg!!, false) }
+            if (error != null) item { StatusMessage(error!!, true) }
         }
+    }
+}
+
+@Composable
+private fun SectionCard(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        Column(Modifier.padding(16.dp), content = content)
+    }
+}
+
+@Composable
+private fun StatusMessage(message: String, isError: Boolean) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = if (isError) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
+    ) {
+        Text(
+            (if (isError) "⚠  " else "✓  ") + message,
+            modifier = Modifier.padding(14.dp),
+            color = if (isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+            fontSize = 13.sp,
+        )
     }
 }

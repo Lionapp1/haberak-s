@@ -2,8 +2,13 @@ name: Build & Sign APK
 
 on:
   push:
+    branches: [ main, "feature/**" ]
+  pull_request:
     branches: [ main ]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -22,48 +27,51 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Prepare signing keystore
+      - name: Validate persistent release-signing secrets
         env:
           SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
           SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        shell: bash
         run: |
-          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
-            echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
-            {
-              echo "KEYSTORE_FILE=/tmp/release.keystore"
-              echo "KEYSTORE_PASSWORD=$SIGNING_KEYSTORE_PASSWORD"
-              echo "KEY_ALIAS=$SIGNING_KEY_ALIAS"
-              echo "KEY_PASSWORD=$SIGNING_KEY_PASSWORD"
-            } > keystore.properties
-          else
-            echo "::warning::No signing secrets - generating a temporary keystore."
-            keytool -genkeypair -v -keystore /tmp/release.keystore -alias filebeam \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass filebeam123 -keypass filebeam123 \
-              -dname "CN=FileBeam, OU=Lion, O=Lion, L=Istanbul, S=Istanbul, C=TR"
-            {
-              echo "KEYSTORE_FILE=/tmp/release.keystore"
-              echo "KEYSTORE_PASSWORD=filebeam123"
-              echo "KEY_ALIAS=filebeam"
-              echo "KEY_PASSWORD=filebeam123"
-            } > keystore.properties
-          fi
+          set -euo pipefail
+          for key in SIGNING_KEYSTORE_BASE64 SIGNING_KEYSTORE_PASSWORD SIGNING_KEY_ALIAS SIGNING_KEY_PASSWORD; do
+            if [[ -z "${!key}" ]]; then
+              echo "::error::Missing required GitHub Actions secret: $key"
+              echo "::error::A temporary keystore is intentionally not generated because it breaks install-over-update."
+              exit 1
+            fi
+          done
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/filebeam-release.keystore"
+          keytool -list -keystore "$RUNNER_TEMP/filebeam-release.keystore" \
+            -storepass "$SIGNING_KEYSTORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" >/dev/null
+          {
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/filebeam-release.keystore"
+            echo "KEYSTORE_PASSWORD=$SIGNING_KEYSTORE_PASSWORD"
+            echo "KEY_ALIAS=$SIGNING_KEY_ALIAS"
+            echo "KEY_PASSWORD=$SIGNING_KEY_PASSWORD"
+          } > keystore.properties
 
       - name: Build release APK
+        shell: bash
         run: |
-          set +e
-          gradle assembleRelease --stacktrace 2>&1 | tee build.log
-          grep -E "^e: |error:" build.log | head -50 > errors.txt || true
-          while IFS= read -r l; do echo "::error::$l"; done < errors.txt
-          test -f app/build/outputs/apk/release/app-release.apk
+          set -euo pipefail
+          gradle assembleRelease --stacktrace
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          apksigner verify --verbose --print-certs "$APK"
+          sha256sum "$APK" > "$APK.sha256"
 
-      - name: Upload APK
+      - name: Upload signed APK and checksum
         uses: actions/upload-artifact@v4
         with:
           name: FileBeam-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/app-release.apk.sha256
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Upload reports on failure
         if: failure()
@@ -72,4 +80,5 @@ jobs:
           name: build-reports
           path: |
             app/build/reports/
-            build.log
+            build/
+          if-no-files-found: ignore

@@ -2,6 +2,7 @@ package com.lion.haberakisi.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
@@ -41,7 +42,7 @@ object NewsRepository {
         conn.readTimeout = 12_000
         conn.setRequestProperty("User-Agent", "HaberAkisi/1.0 (Android)")
         try {
-            if (conn.responseCode !in 200..299) error("HTTP ${conn.responseCode}")
+            if (conn.responseCode !in 200..299) error("HTTP " + conn.responseCode)
             return conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         } finally {
             conn.disconnect()

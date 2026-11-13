@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.lion.haberakisi
 
 import android.os.Bundle
@@ -47,7 +49,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(vm: NewsViewModel = viewModel()) {
     val state by vm.state.collectAsState()

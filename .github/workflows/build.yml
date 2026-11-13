@@ -11,7 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-debug:
+    name: Build and verify debug APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,22 +28,60 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Validate persistent release-signing secrets
-        env:
-          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+      - name: Run unit tests and build debug APK
+        run: |
+          set -euo pipefail
+          gradle testDebugUnitTest assembleDebug --stacktrace
+          test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FileBeam-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  build-release:
+    name: Build persistent signed release APK
+    runs-on: ubuntu-latest
+    env:
+      SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+      SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+      SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+      SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check signing secret availability
+        id: signing
+        shell: bash
+        run: |
+          if [[ -n "$SIGNING_KEYSTORE_BASE64" && -n "$SIGNING_KEYSTORE_PASSWORD" && -n "$SIGNING_KEY_ALIAS" && -n "$SIGNING_KEY_PASSWORD" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Release APK skipped: configure the four persistent signing secrets to produce an install-over-update release."
+          fi
+
+      - name: Set up JDK 17
+        if: steps.signing.outputs.available == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        if: steps.signing.outputs.available == 'true'
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.9'
+
+      - name: Prepare and validate persistent keystore
+        if: steps.signing.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          for key in SIGNING_KEYSTORE_BASE64 SIGNING_KEYSTORE_PASSWORD SIGNING_KEY_ALIAS SIGNING_KEY_PASSWORD; do
-            if [[ -z "${!key}" ]]; then
-              echo "::error::Missing required GitHub Actions secret: $key"
-              echo "::error::A temporary keystore is intentionally not generated because it breaks install-over-update."
-              exit 1
-            fi
-          done
           echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/filebeam-release.keystore"
           keytool -list -keystore "$RUNNER_TEMP/filebeam-release.keystore" \
             -storepass "$SIGNING_KEYSTORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" >/dev/null
@@ -53,7 +92,8 @@ jobs:
             echo "KEY_PASSWORD=$SIGNING_KEY_PASSWORD"
           } > keystore.properties
 
-      - name: Build release APK
+      - name: Build and verify signed release APK
+        if: steps.signing.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -64,6 +104,7 @@ jobs:
           sha256sum "$APK" > "$APK.sha256"
 
       - name: Upload signed APK and checksum
+        if: steps.signing.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: FileBeam-release-apk
@@ -72,13 +113,3 @@ jobs:
             app/build/outputs/apk/release/app-release.apk.sha256
           if-no-files-found: error
           retention-days: 30
-
-      - name: Upload reports on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-reports
-          path: |
-            app/build/reports/
-            build/
-          if-no-files-found: ignore

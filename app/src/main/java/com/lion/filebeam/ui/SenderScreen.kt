@@ -26,6 +26,7 @@ import com.journeyapps.barcodescanner.ScanOptions
 import com.lion.filebeam.Discovery
 import com.lion.filebeam.TransferClient
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -47,12 +48,22 @@ fun SenderScreen(onBack: () -> Unit) {
     val listenJob = remember { mutableStateOf<Job?>(null) }
     DisposableEffect(Unit) {
         listenJob.value = scope.launch {
-            Discovery.listen { b ->
+            Discovery.listen(context) { b ->
                 val idx = devices.indexOfFirst { it.ip == b.ip }
                 if (idx >= 0) devices[idx] = b else devices.add(b)
+                if (selected?.ip == b.ip) selected = b
             }
         }
         onDispose { listenJob.value?.cancel() }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(3000)
+            val cutoff = System.currentTimeMillis() - 9000
+            devices.removeAll { it.seen < cutoff }
+            if (selected?.let { it.seen < cutoff && it.pin.isBlank() } == true) selected = null
+        }
     }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
@@ -77,7 +88,7 @@ fun SenderScreen(onBack: () -> Unit) {
         doneMsg = null
         sendJob = scope.launch {
             try {
-                TransferClient.send(context, dev.ip, dev.port, dev.pin, picked) { p -> progress = p }
+                TransferClient.send(context, dev.ip, dev.port, dev.pin.ifBlank { manualPin }, picked) { p -> progress = p }
                 doneMsg = picked.size.toString() + " dosya gönderildi 🎉"
                 picked = emptyList()
             } catch (e: Exception) {
@@ -157,7 +168,7 @@ fun SenderScreen(onBack: () -> Unit) {
             OutlinedTextField(
                 value = manualPin,
                 onValueChange = { manualPin = it.take(6) },
-                label = { Text("TV'deki PIN") },
+                label = { Text("TV'deki PIN (6 rakam)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -183,12 +194,12 @@ fun SenderScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = { startSend() },
-                enabled = !sending && selected != null && picked.isNotEmpty(),
+                enabled = !sending && selected != null && picked.isNotEmpty() && (selected?.pin?.length == 6 || manualPin.length == 6),
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
                 Icon(Icons.Filled.Send, null)
                 Spacer(Modifier.width(8.dp))
-                Text(if (selected == null) "Önce cihaz seç" else "GÖNDER", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(if (selected == null) "Önce cihaz seç" else if (selected?.pin?.length != 6 && manualPin.length != 6) "TV PIN kodunu gir" else "GÖNDER", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
             progress?.let { p ->

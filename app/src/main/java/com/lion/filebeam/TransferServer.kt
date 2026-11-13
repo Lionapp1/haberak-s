@@ -22,6 +22,7 @@ class TransferServer(
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var serverSocket: ServerSocket? = null
+    private val activeClients = java.util.concurrent.ConcurrentHashMap.newKeySet<Socket>()
     @Volatile private var running = false
 
     fun start(): Int {
@@ -35,7 +36,14 @@ class TransferServer(
             while (running) {
                 try {
                     val client = ss.accept()
-                    Thread({ handle(client) }, "FileBeam-client").start()
+                    activeClients.add(client)
+                    Thread({
+                        try {
+                            handle(client)
+                        } finally {
+                            activeClients.remove(client)
+                        }
+                    }, "FileBeam-client").start()
                 } catch (e: Exception) {
                     if (running) mainHandler.post { onError(e.message ?: "Sunucu hatası") }
                 }
@@ -47,6 +55,8 @@ class TransferServer(
     fun stop() {
         running = false
         runCatching { serverSocket?.close() }
+        activeClients.forEach { client -> runCatching { client.close() } }
+        activeClients.clear()
         serverSocket = null
     }
 

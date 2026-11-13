@@ -115,7 +115,7 @@ fun ReceiverScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 )
                 Text(
-                    formatSize(p.bytes) + " / " + formatSize(p.total) + "  •  " + formatSpeed(p.speedBps),
+                    formatSize(p.bytes) + " / " + (if (p.total >= 0) formatSize(p.total) else "Bilinmiyor") + "  •  " + formatSpeed(p.speedBps),
                     fontSize = 13.sp,
                 )
             }

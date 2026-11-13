@@ -7,7 +7,7 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 
-/** TV / alÄ±cÄ± taraf: gelen dosyalarÄ± ham TCP Ã¼zerinden en yÃ¼ksek hÄ±zda kabul eder. */
+/** TV / alıcı taraf: gelen dosyaları ham TCP üzerinden en yüksek hızda kabul eder. */
 class TransferServer(
     private val context: Context,
     private val pin: String,
@@ -31,7 +31,7 @@ class TransferServer(
                     val client = ss.accept()
                     Thread { handle(client) }.start()
                 } catch (e: Exception) {
-                    if (running) onError(e.message ?: "Sunucu hatasÄ±")
+                    if (running) onError(e.message ?: "Sunucu hatası")
                 }
             }
         }.start()
@@ -87,7 +87,7 @@ class TransferServer(
             FileSaver.finish(context, savedUri)
             onFileDone(name)
         } catch (e: Exception) {
-            onError(e.message ?: "AktarÄ±m hatasÄ±")
+            onError(e.message ?: "Aktarım hatası")
         } finally {
             runCatching { socket.close() }
         }

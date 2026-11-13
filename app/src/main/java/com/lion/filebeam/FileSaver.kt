@@ -24,8 +24,8 @@ object FileSaver {
             }
             val resolver = context.contentResolver
             val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: throw IOException("KayÄ±t yeri oluÅturulamadÄ±")
-            val out = resolver.openOutputStream(uri) ?: throw IOException("Dosya aÃ§Ä±lamadÄ±")
+                ?: throw IOException("Kayıt yeri oluşturulamadı")
+            val out = resolver.openOutputStream(uri) ?: throw IOException("Dosya açılamadı")
             uri to out
         } else {
             val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir

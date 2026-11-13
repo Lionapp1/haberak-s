@@ -13,7 +13,7 @@ import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.net.Socket
 
-/** Telefon / gÃ¶nderici taraf: dosyalarÄ± ham TCP ile uÃ§tan uca yollar. */
+/** Telefon / gönderici taraf: dosyaları ham TCP ile uçtan uca yollar. */
 object TransferClient {
 
     data class Progress(val fileName: String, val bytes: Long, val total: Long, val speedBps: Long)
@@ -29,7 +29,7 @@ object TransferClient {
         val resolver = context.contentResolver
         for (uri in uris) {
             val name = queryName(resolver, uri) ?: "dosya"
-            val pfd = resolver.openFileDescriptor(uri, "r") ?: throw IOException("Dosya aÃ§Ä±lamadÄ±")
+            val pfd = resolver.openFileDescriptor(uri, "r") ?: throw IOException("Dosya açılamadı")
             val size = pfd.statSize
             pfd.close()
 
@@ -45,8 +45,8 @@ object TransferClient {
                 out.flush()
                 when (reader.readLine()) {
                     "OK" -> {}
-                    "PIN" -> throw IOException("PIN hatalÄ± â TV ekranÄ±ndaki PIN ile tekrar dene")
-                    else -> throw IOException("TV baÄlantÄ±yÄ± reddetti")
+                    "PIN" -> throw IOException("PIN hatalı — TV ekranındaki PIN ile tekrar dene")
+                    else -> throw IOException("TV bağlantıyı reddetti")
                 }
 
                 resolver.openInputStream(uri)?.use { ins ->
@@ -69,7 +69,7 @@ object TransferClient {
                     out.flush()
                 }
                 val done = reader.readLine()
-                if (done != "DONE") throw IOException("AktarÄ±m onaylanmadÄ±")
+                if (done != "DONE") throw IOException("Aktarım onaylanmadı")
             } finally {
                 runCatching { conn.close() }
             }

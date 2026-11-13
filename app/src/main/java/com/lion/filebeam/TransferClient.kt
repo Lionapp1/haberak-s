@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedOutputStream
@@ -13,9 +14,8 @@ import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.net.Socket
 
-/** Telefon / gönderici taraf: dosyaları ham TCP ile uçtan uca yollar. */
+/** Telefon / gönderici taraf: dosyaları TCP üzerinden güvenilir biçimde yollar. */
 object TransferClient {
-
     data class Progress(val fileName: String, val bytes: Long, val total: Long, val speedBps: Long)
 
     suspend fun send(
@@ -26,59 +26,89 @@ object TransferClient {
         uris: List<Uri>,
         onProgress: (Progress) -> Unit,
     ) = withContext(Dispatchers.IO) {
+        require(port in 1..65535) { "Bağlantı portu geçersiz" }
+        require(pin.length == 6 && pin.all(Char::isDigit)) { "PIN 6 rakam olmalı" }
         val resolver = context.contentResolver
+
         for (uri in uris) {
             val name = queryName(resolver, uri) ?: "dosya"
-            val pfd = resolver.openFileDescriptor(uri, "r") ?: throw IOException("Dosya açılamadı")
-            val size = pfd.statSize
-            pfd.close()
+            val size = querySize(resolver, uri)
+            val encodedName = Base64.encodeToString(
+                name.toByteArray(Charsets.UTF_8),
+                Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
+            )
 
+            val source = resolver.openInputStream(uri) ?: throw IOException("Dosya açılamadı")
             val conn = Socket()
             try {
                 conn.tcpNoDelay = true
-                conn.connect(InetSocketAddress(ip, port), 8000)
-                conn.soTimeout = 20_000
-                val out = BufferedOutputStream(conn.getOutputStream(), 256 * 1024)
-                val reader = BufferedReader(InputStreamReader(conn.getInputStream(), Charsets.UTF_8))
+                conn.connect(InetSocketAddress(ip, port), 10_000)
+                conn.soTimeout = 120_000
 
-                out.write(("BEAM1|" + pin + "|" + name + "|" + size + "\n").toByteArray(Charsets.UTF_8))
+                val out = BufferedOutputStream(conn.getOutputStream(), 256 * 1024)
+                val reader = BufferedReader(InputStreamReader(conn.getInputStream(), Charsets.US_ASCII))
+                out.write("BEAM2|$pin|$size|$encodedName\n".toByteArray(Charsets.US_ASCII))
                 out.flush()
+
                 when (reader.readLine()) {
-                    "OK" -> {}
+                    "OK" -> Unit
                     "PIN" -> throw IOException("PIN hatalı — TV ekranındaki PIN ile tekrar dene")
                     else -> throw IOException("TV bağlantıyı reddetti")
                 }
 
-                resolver.openInputStream(uri)?.use { ins ->
-                    val buf = ByteArray(64 * 1024)
-                    var total = 0L
-                    var last = 0L
+                source.use { input ->
+                    val buffer = ByteArray(64 * 1024)
+                    var sent = 0L
+                    var lastBytes = 0L
                     var lastTime = System.currentTimeMillis()
-                    while (true) {
-                        val n = ins.read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        total += n
+
+                    while (size < 0L || sent < size) {
+                        val wanted = if (size < 0L) buffer.size else minOf(
+                            buffer.size.toLong(), size - sent
+                        ).toInt()
+                        val count = input.read(buffer, 0, wanted)
+                        if (count < 0) {
+                            if (size >= 0L && sent != size) {
+                                throw IOException("Kaynak dosya beklenenden kısa: $sent / $size bayt")
+                            }
+                            break
+                        }
+                        if (count == 0) continue
+                        out.write(buffer, 0, count)
+                        sent += count
                         val now = System.currentTimeMillis()
-                        if (now - lastTime > 300) {
-                            onProgress(Progress(name, total, size, (total - last) * 1000 / (now - lastTime)))
-                            last = total
+                        if (now - lastTime >= 300) {
+                            onProgress(Progress(name, sent, size, (sent - lastBytes) * 1000 / (now - lastTime)))
+                            lastBytes = sent
                             lastTime = now
                         }
                     }
                     out.flush()
                 }
-                val done = reader.readLine()
-                if (done != "DONE") throw IOException("Aktarım onaylanmadı")
+
+                // EOF terminates unknown-length transfers; for known sizes it also
+                // prevents the receiver from waiting for any additional payload.
+                conn.shutdownOutput()
+                if (reader.readLine() != "DONE") throw IOException("TV dosyanın tamamlandığını onaylamadı")
+                onProgress(Progress(name, if (size >= 0L) size else 0L, size, 0L))
             } finally {
+                runCatching { source.close() }
                 runCatching { conn.close() }
             }
         }
     }
 
     private fun queryName(resolver: ContentResolver, uri: Uri): String? =
-        resolver.query(uri, null, null, null, null)?.use { c ->
-            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (idx >= 0 && c.moveToFirst()) c.getString(idx) else null
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
         }
+
+    /** Content providers are allowed to report an unknown length; -1 means stream to EOF. */
+    private fun querySize(resolver: ContentResolver, uri: Uri): Long =
+        resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+            val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (index >= 0 && cursor.moveToFirst() && !cursor.isNull(index)) cursor.getLong(index).takeIf { it >= 0L } ?: -1L
+            else -1L
+        } ?: -1L
 }

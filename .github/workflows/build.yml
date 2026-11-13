@@ -2,11 +2,21 @@ name: Build & Sign APK
 
 on:
   push:
+    branches: [ main, 'feature/**' ]
+  pull_request:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: filebeam-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  build-debug:
+    name: Build and verify debug APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,54 +32,104 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Prepare signing keystore
-        env:
-          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
-          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+      - name: Build debug APK
         run: |
-          if [ -n "$SIGNING_KEYSTORE_BASE64" ]; then
-            echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
-            {
-              echo "KEYSTORE_FILE=/tmp/release.keystore"
-              echo "KEYSTORE_PASSWORD=$SIGNING_KEYSTORE_PASSWORD"
-              echo "KEY_ALIAS=$SIGNING_KEY_ALIAS"
-              echo "KEY_PASSWORD=$SIGNING_KEY_PASSWORD"
-            } > keystore.properties
+          set -euo pipefail
+          gradle assembleDebug --stacktrace
+          test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FileBeam-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  build-release:
+    name: Build persistent signed release APK
+    runs-on: ubuntu-latest
+    env:
+      SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+      SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+      SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+      SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check signing secret availability
+        id: signing
+        shell: bash
+        run: |
+          if [[ -n "$SIGNING_KEYSTORE_BASE64" && -n "$SIGNING_KEYSTORE_PASSWORD" && -n "$SIGNING_KEY_ALIAS" && -n "$SIGNING_KEY_PASSWORD" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::No signing secrets - generating a temporary keystore."
-            keytool -genkeypair -v -keystore /tmp/release.keystore -alias filebeam \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass filebeam123 -keypass filebeam123 \
-              -dname "CN=FileBeam, OU=Lion, O=Lion, L=Istanbul, S=Istanbul, C=TR"
-            {
-              echo "KEYSTORE_FILE=/tmp/release.keystore"
-              echo "KEYSTORE_PASSWORD=filebeam123"
-              echo "KEY_ALIAS=filebeam"
-              echo "KEY_PASSWORD=filebeam123"
-            } > keystore.properties
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Release APK skipped: configure the four persistent signing secrets to produce an install-over-update release."
           fi
 
-      - name: Build release APK
-        run: |
-          set +e
-          gradle assembleRelease --stacktrace 2>&1 | tee build.log
-          grep -E "^e: |error:" build.log | head -50 > errors.txt || true
-          while IFS= read -r l; do echo "::error::$l"; done < errors.txt
-          test -f app/build/outputs/apk/release/app-release.apk
+      - name: Set up JDK 17
+        if: steps.signing.outputs.available == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-      - name: Upload APK
+      - name: Setup Gradle
+        if: steps.signing.outputs.available == 'true'
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.9'
+
+      - name: Prepare and validate persistent keystore
+        if: steps.signing.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/filebeam-release.keystore"
+          keytool -list -keystore "$RUNNER_TEMP/filebeam-release.keystore" \
+            -storepass "$SIGNING_KEYSTORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" >/dev/null
+          {
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/filebeam-release.keystore"
+            echo "KEYSTORE_PASSWORD=$SIGNING_KEYSTORE_PASSWORD"
+            echo "KEY_ALIAS=$SIGNING_KEY_ALIAS"
+            echo "KEY_PASSWORD=$SIGNING_KEY_PASSWORD"
+          } > keystore.properties
+
+      - name: Set up Android SDK
+        if: steps.signing.outputs.available == 'true'
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          packages: platform-tools
+
+      - name: Install Android build tools
+        if: steps.signing.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "build-tools;35.0.0"
+          echo "$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_PATH"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
+
+      - name: Build and verify signed release APK
+        if: steps.signing.outputs.available == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle assembleRelease --stacktrace
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          apksigner verify --verbose --print-certs "$APK"
+          sha256sum "$APK" > "$APK.sha256"
+
+      - name: Upload signed APK and checksum
+        if: steps.signing.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: FileBeam-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
-
-      - name: Upload reports on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-reports
           path: |
-            app/build/reports/
-            build.log
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/app-release.apk.sha256
+          if-no-files-found: error
+          retention-days: 30

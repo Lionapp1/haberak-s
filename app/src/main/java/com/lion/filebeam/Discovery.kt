@@ -9,6 +9,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.SocketTimeoutException
 
@@ -41,7 +42,7 @@ object Discovery {
         return ""
     }
 
-    /** AlÄ±cÄ± (TV): her 2 saniyede bir varlÄ±ÄÄ±nÄ± duyurur. */
+    /** Alıcı (TV): her 2 saniyede bir varlığını duyurur. */
     suspend fun broadcastLoop(port: Int, pin: String) = withContext(Dispatchers.IO) {
         DatagramSocket().use { sock ->
             sock.broadcast = true
@@ -57,7 +58,7 @@ object Discovery {
         }
     }
 
-    /** GÃ¶nderici (telefon): aÄdaki alÄ±cÄ±larÄ± dinler. */
+    /** Gönderici (telefon): ağdaki alıcıları dinler. */
     suspend fun listen(onBeacon: (Beacon) -> Unit) = withContext(Dispatchers.IO) {
         DatagramSocket(null).use { sock ->
             sock.reuseAddress = true

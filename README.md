@@ -17,7 +17,7 @@ Android telefonlar ve Android TV arasında aynı yerel Wi-Fi ağı üzerinden do
 3. Dosyaları seçip gönderin. Her iki cihaz da aynı yerel ağda olmalıdır.
 
 ## Kalıcı imzalı APK (önemli)
-GitHub Actions geçici imza anahtarı üretmez. Geçici anahtar her derlemede değişebileceği için APK'nın önceki kurulumun üzerine güncellenmesini garanti etmez.
+GitHub Actions her zaman debug APK üretir. Kalıcı release APK yalnızca dört imzalama secret'ı tanımlandığında üretilir. Geçici imza anahtarı kullanılmaz; böylece her derlemede değişen imzayla yanlış bir güncelleme beklentisi oluşturulmaz.
 
 Repository Settings → Secrets and variables → Actions bölümüne aşağıdaki dört secret eklenmelidir:
 - `SIGNING_KEYSTORE_BASE64`: aynı release keystore dosyasının Base64 içeriği
@@ -27,11 +27,12 @@ Repository Settings → Secrets and variables → Actions bölümüne aşağıda
 
 **Mevcut kullanıcıların cihazlarında kurulu APK'nın imzasıyla aynı keystore kullanılmalıdır.** Eski keystore kaybolduysa farklı imzalı APK, Android tarafından mevcut uygulamanın üzerine güncelleme olarak kurulamaz; eski uygulamayı kaldırmak veri kaybına yol açabilir.
 
-Actions başarılı olduğunda `FileBeam-release-apk` artifact'i içinde APK ve SHA-256 checksum bulunur. Workflow ayrıca APK imzasını doğrular.
+Secret'lar tanımlı değilse `FileBeam-debug-apk` artifact'i kullanılabilir (mevcut release kurulumunun üzerine yüklenemez). Dört secret doğru tanımlandığında `FileBeam-release-apk` artifact'i içinde APK ve SHA-256 checksum bulunur; workflow imzayı doğrular.
 
 ## Teknik protokol
-- UDP 47812: cihaz keşif beacon'ı
+- UDP 47812: PIN içermeyen cihaz keşif beacon'ı
 - TCP 47813: dosya aktarımı
+- Keşif mesajı: `FILEBEAM2|device|ip|port` (PIN yayınlanmaz)
 - Aktarım başlığı: `BEAM2|pin|size|base64url(filename)`
 - `size=-1`: sağlayıcı dosya boyutunu bildirmediğinde akış EOF'a kadar aktarılır.
 - Başlık, ikili dosya içeriğini önceden okumamak için tamponlamasız okunur.

@@ -3,6 +3,7 @@
 package com.lion.filebeam.ui
 
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.view.WindowManager
 import androidx.compose.foundation.Image
@@ -34,6 +35,7 @@ import com.lion.filebeam.TransferServer
 @Composable
 fun ReceiverScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val isTv = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
     val pin = remember { (100000..999999).random().toString() }
     val ip = remember { Discovery.localIp() }
     var port by remember { mutableIntStateOf(0) }
@@ -75,20 +77,20 @@ fun ReceiverScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Alıcı — " + (android.os.Build.MODEL ?: "TV"), fontWeight = FontWeight.Bold) },
+                title = { Text("Alıcı — " + (android.os.Build.MODEL ?: "TV"), fontWeight = FontWeight.Bold, fontSize = if (isTv) 25.sp else 20.sp) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") } },
             )
         }
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(24.dp),
+            Modifier.fillMaxSize().padding(padding).padding(if (isTv) 36.dp else 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Bu cihaz hazır 📺", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("Bu cihaz hazır 📺", fontSize = if (isTv) 34.sp else 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Text(
                 "Telefonda FileBeam > Gönder > bu cihazı seç",
-                fontSize = 14.sp,
+                fontSize = if (isTv) 20.sp else 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(16.dp))
@@ -96,27 +98,27 @@ fun ReceiverScreen(onBack: () -> Unit) {
             if (ip.isNotBlank() && port > 0) {
                 QrImage(
                     content = "filebeam://" + ip + ":" + port + "#" + pin,
-                    modifier = Modifier.size(if (context.resources.configuration.smallestScreenWidthDp >= 600) 340.dp else 240.dp).clip(RoundedCornerShape(16.dp)).background(Color.White).padding(8.dp),
+                    modifier = Modifier.size(if (isTv) 320.dp else if (context.resources.configuration.smallestScreenWidthDp >= 600) 340.dp else 240.dp).clip(RoundedCornerShape(16.dp)).background(Color.White).padding(8.dp),
                 )
             } else {
                 CircularProgressIndicator()
             }
 
             Spacer(Modifier.height(16.dp))
-            Text("PIN", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(pin, fontSize = 44.sp, fontWeight = FontWeight.Bold, letterSpacing = 8.sp)
-            Text(ip + ":" + port, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("PIN", fontSize = if (isTv) 18.sp else 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(pin, fontSize = if (isTv) 60.sp else 44.sp, fontWeight = FontWeight.Bold, letterSpacing = 8.sp)
+            Text(ip + ":" + port, fontSize = if (isTv) 17.sp else 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             incoming?.let { p ->
                 Spacer(Modifier.height(16.dp))
-                Text(p.fileName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(p.fileName, fontSize = if (isTv) 19.sp else 14.sp, fontWeight = FontWeight.SemiBold)
                 LinearProgressIndicator(
                     progress = { if (p.total > 0) p.bytes.toFloat() / p.total else 0f },
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 )
                 Text(
                     formatSize(p.bytes) + " / " + (if (p.total >= 0) formatSize(p.total) else "Bilinmiyor") + "  •  " + formatSpeed(p.speedBps),
-                    fontSize = 13.sp,
+                    fontSize = if (isTv) 17.sp else 13.sp,
                 )
             }
 
@@ -129,7 +131,7 @@ fun ReceiverScreen(onBack: () -> Unit) {
                 Spacer(Modifier.height(16.dp))
                 LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                     items(log) { line ->
-                        Text(line, fontSize = 14.sp, modifier = Modifier.padding(vertical = 4.dp))
+                        Text(line, fontSize = if (isTv) 18.sp else 14.sp, modifier = Modifier.padding(vertical = 4.dp))
                     }
                 }
             }

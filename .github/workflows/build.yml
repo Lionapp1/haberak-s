@@ -38,7 +38,7 @@ jobs:
               echo "KEY_PASSWORD=$SIGNING_KEY_PASSWORD"
             } > keystore.properties
           else
-            echo "::warning::Ä°mza secret'larÄ± yok â geÃ§ici keystore Ã¼retiliyor."
+            echo "::warning::No signing secrets - generating a temporary keystore."
             keytool -genkeypair -v -keystore /tmp/release.keystore -alias filebeam \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass filebeam123 -keypass filebeam123 \
@@ -53,8 +53,10 @@ jobs:
 
       - name: Build release APK
         run: |
+          set +e
           gradle assembleRelease --stacktrace 2>&1 | tee build.log
-          grep -E "^e: |error:" build.log | head -50 | while IFS= read -r l; do echo "::error::$l"; done
+          grep -E "^e: |error:" build.log | head -50 > errors.txt || true
+          while IFS= read -r l; do echo "::error::$l"; done < errors.txt
           test -f app/build/outputs/apk/release/app-release.apk
 
       - name: Upload APK

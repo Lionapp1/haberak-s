@@ -96,6 +96,12 @@ jobs:
             echo "KEY_PASSWORD=$SIGNING_KEY_PASSWORD"
           } > keystore.properties
 
+      - name: Set up Android SDK
+        if: steps.signing.outputs.available == 'true'
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+
       - name: Install Android build tools
         if: steps.signing.outputs.available == 'true'
         shell: bash

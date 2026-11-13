@@ -15,8 +15,13 @@ Telefondan Android TV'ye (ve herhangi iki Android cihaz arasÄ±nda) **yerel aÄ
 ## KullanÄ±m
 1. **TV'de:** FileBeam > "Al" â QR + PIN ekranda gÃ¶rÃ¼nÃ¼r
 2. **Telefonda:** FileBeam > "GÃ¶nder" â cihazÄ± listeden seÃ§ **veya** QR'Ä± okut **veya** IP+PIN gir
-3. DosyalarÄ± seÂ(ad
-ðåTÈÈ1,^[1,HTÈ
-Ú]XXÝ[ÛÊB\ÚÛÛ\ñ,HXÝ[ÛÈÝÛX]ZÈ\\È\YXÝÈ[PX[K\[X\ÙKX\ØØ[1,Xñ,H[^HpéÚ[PQQIÙZÚHÙXÜ]	ñ,HZÛ^Z[ÒQÓS×ÒÑVTÕÔWÐTÑMÒQÓS×ÒÑVTÕÔWÔTÔÕÓÔÒQÓS×ÒÑVWÐSPTØÒQÓS×ÒÑVWÔTÔÕÓÔÈÈZÛZÂHÝÚÛÛQÎL
-ÙqgÙHXXÛÛKÔÎLÈ
-ZÝ\±,[JKØ]1,\qgÛ1,q'ñ,NPSL_[ÜÞXXY1,_Þ]]HTpéÙ\q'ÚN[XX[NËÏ\ÜÏ[H^[±,HÚQHq'ñ,[±,HÙ\ZÝ\\ÈZ\ØY\q'Û\±,[HT^Û\Þ[ÛH0éØ[1,qgÛX^XX[\
+3. DosyalarÄ± seÃ§ â **GÃNDER**
+
+## Ä°mzalÄ± APK (GitHub Actions)
+Push sonrasÄ± Actions otomatik derler; Artifacts > `FileBeam-release-apk`. KalÄ±cÄ± imza iÃ§in README'deki 4 secret'Ä± ekleyin:
+`SIGNING_KEYSTORE_BASE64`, `SIGNING_KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`.
+
+## Teknik
+- Protokol: UDP 47812 (keÅfi beacon), TCP 47813 (aktarÄ±m). SatÄ±r baÅlÄ±ÄÄ±: `BEAM1|pin|dosyaadÄ±|boyut`
+- QR iÃ§eriÄi: `filebeam://<ip>:<port>#<pin>`
+- AynÄ± WiFi aÄÄ±nÄ± gerektirir; misafir aÄlarÄ±nda AP izolasyonu Ã§alÄ±Åmayabilir.

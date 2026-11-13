@@ -200,7 +200,7 @@ fun SenderScreen(onBack: () -> Unit) {
                 )
                 Text(
                     formatSize(p.bytes) + " / " + formatSize(p.total) + "  â¢  " + formatSpeed(p.speedBps),
-                    fontSixe = 13.sp,
+                    fontSize = 13.sp,
                 )
             }
 

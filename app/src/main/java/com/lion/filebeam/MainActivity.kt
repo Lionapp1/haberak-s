@@ -9,6 +9,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -81,14 +83,14 @@ fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit) {
     ) { padding ->
         Box(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = if (isTv) 48.dp else 20.dp, vertical = if (isTv) 30.dp else 20.dp),
-            contentAlignment = Alignment.Center,
+            contentAlignment = Alignment.TopCenter,
         ) {
             BoxWithConstraints(Modifier.fillMaxWidth().widthIn(max = if (isTv) 1180.dp else 900.dp)) {
                 val wide = maxWidth >= 640.dp || isTv
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(vertical = if (isTv) 20.dp else 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
+                    verticalArrangement = Arrangement.Top,
                 ) {
                     Surface(
                         color = MaterialTheme.colorScheme.secondaryContainer,
@@ -176,7 +178,7 @@ fun ModeCard(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (isTv) 250.dp else 154.dp)
+            .heightIn(min = if (isTv) 250.dp else 104.dp)
             .onFocusChanged { focused = it.isFocused }
             .border(
                 width = if (focused) 3.dp else 1.dp,
@@ -190,29 +192,38 @@ fun ModeCard(
         ),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (focused) 8.dp else 2.dp),
     ) {
-        Column(
-            Modifier.fillMaxSize().padding(if (isTv) 30.dp else 20.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Surface(
-                shape = RoundedCornerShape(15.dp),
-                color = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(if (isTv) 66.dp else 48.dp),
+        if (isTv) {
+            Column(
+                Modifier.fillMaxSize().padding(30.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = if (focused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(if (isTv) 32.dp else 24.dp),
-                    )
+                Surface(shape = RoundedCornerShape(15.dp), color = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(66.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(icon, null, tint = if (focused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(32.dp))
+                    }
+                }
+                Column {
+                    Text(title, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    Text(subtitle, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 25.sp)
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Column {
-                Text(title, fontSize = if (isTv) 30.sp else 21.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                Text(subtitle, fontSize = if (isTv) 18.sp else 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = if (isTv) 25.sp else 18.sp)
+        } else {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(shape = RoundedCornerShape(14.dp), color = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(48.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(icon, null, tint = if (focused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(24.dp))
+                    }
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(3.dp))
+                    Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 16.sp)
+                }
             }
         }
     }

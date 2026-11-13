@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: filebeam-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-debug:
     name: Build and verify debug APK

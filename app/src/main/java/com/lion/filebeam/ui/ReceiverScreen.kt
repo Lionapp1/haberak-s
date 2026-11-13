@@ -96,7 +96,7 @@ fun ReceiverScreen(onBack: () -> Unit) {
             if (ip.isNotBlank() && port > 0) {
                 QrImage(
                     content = "filebeam://" + ip + ":" + port + "#" + pin,
-                    modifier = Modifier.size(260.dp).clip(RoundedCornerShape(16.dp)).background(Color.White).padding(8.dp),
+                    modifier = Modifier.size(if (context.resources.configuration.smallestScreenWidthDp >= 600) 340.dp else 240.dp).clip(RoundedCornerShape(16.dp)).background(Color.White).padding(8.dp),
                 )
             } else {
                 CircularProgressIndicator()

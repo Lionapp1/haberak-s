@@ -26,18 +26,31 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Decode signing keystore
+      - name: Prepare signing keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
-        run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/release.keystore"
-          echo "KEYSTORE_FILE=$GITHUB_WORKSPACE/release.keystore" >> "$GITHUB_ENV"
-
-      - name: Build release APK
-        env:
           KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/release.keystore"
+            echo "Gerçek release anahtarı kullanılıyor."
+          else
+            echo "Secret yok: geçici imza anahtarı oluşturuluyor (yalnızca test için)."
+            keytool -genkey -v -keystore "$GITHUB_WORKSPACE/release.keystore" \
+              -alias haberakisi -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass haberakisi -keypass haberakisi \
+              -dname "CN=HaberAkisi, OU=Dev, O=Lion, C=TR"
+          fi
+          echo "KEYSTORE_FILE=$GITHUB_WORKSPACE/release.keystore" >> "$GITHUB_ENV"
+          {
+            echo "KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD:-haberakisi}"
+            echo "KEY_ALIAS=${KEY_ALIAS:-haberakisi}"
+            echo "KEY_PASSWORD=${KEY_PASSWORD:-haberakisi}"
+          } >> "$GITHUB_ENV"
+
+      - name: Build release APK
         run: gradle assembleRelease --no-daemon
 
       - name: Upload APK artifact

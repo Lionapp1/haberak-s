@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SenderScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCourotineScope()
+    val scope = rememberCoroutineScope()
 
     val devices = remember { mutableStateListOf<Discovery.Beacon>() }
     var selected by remember { mutableStateOf<Discovery.Beacon?>(null) }
@@ -62,10 +62,10 @@ fun SenderScreen(onBack: () -> Unit) {
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         result.contents?.let { c ->
             Regex("filebeam://([0-9.]+):([0-9]+)#([0-9]+)").find(c)?.let { m ->
-                selected = Discovery.Beacon("QR ile baÄlanÄ±ldÄ±", m.groupValues[1], m.groupValues[2].toInt(), m.groupValues[3])
+                selected = Discovery.Beacon("QR ile bağlanıldı", m.groupValues[1], m.groupValues[2].toInt(), m.groupValues[3])
                 error = null
                 doneMsg = null
-            } ?: run { error = "QR anlaÅÄ±lamadÄ±" }
+            } ?: run { error = "QR anlaşılamadı" }
         }
     }
 
@@ -78,10 +78,10 @@ fun SenderScreen(onBack: () -> Unit) {
         sendJob = scope.launch {
             try {
                 TransferClient.send(context, dev.ip, dev.port, dev.pin, picked) { p -> progress = p }
-                donemsg = picked.size.toString() + " dosya gÃ¶nderildi ð"
+                doneMsg = picked.size.toString() + " dosya gönderildi 🎉"
                 picked = emptyList()
             } catch (e: Exception) {
-                error = e.message ?: "GÃ¶nderilemedi"
+                error = e.message ?: "Gönderilemedi"
             }
             sending = false
             progress = null
@@ -91,18 +91,18 @@ fun SenderScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("GÃ¶nder", fontWeight = FontWeight.Bold) },
+                title = { Text("Gönder", fontWeight = FontWeight.Bold) },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") } },
                 actions = {
                     IconButton(onClick = {
                         scanLauncher.launch(
                             ScanOptions()
                                 .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                                .setPrompt("TV ekranÄ±ndaki QR kodu okut")
+                                .setPrompt("TV ekranındaki QR kodu okut")
                                 .setBeepEnabled(false)
                                 .setOrientationLocked(true)
                         )
-                    }) { Icon(Icons.Filled.QrCodeScanner, "QR ile baÄlan") }
+                    }) { Icon(Icons.Filled.QrCodeScanner, "QR ile bağlan") }
                 },
             )
         }
@@ -111,14 +111,14 @@ fun SenderScreen(onBack: () -> Unit) {
             Modifier.fillMaxSize().padding(padding).padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("AÄdaki cihazlar", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.Start))
+            Text("Ağdaki cihazlar", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.align(Alignment.Start))
             Spacer(Modifier.height(8.dp))
 
             if (devices.isEmpty()) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("TV'de FileBeam > Al ekranÄ±nÄ± aÃ§", fontSize = 14.sp)
-                        Text("Cihazlar burada otomatik listelenecekâ¦", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("TV'de FileBeam > Al ekranını aç", fontSize = 14.sp)
+                        Text("Cihazlar burada otomatik listelenecek…", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             } else {
@@ -133,7 +133,7 @@ fun SenderScreen(onBack: () -> Unit) {
                             else CardDefaults.cardColors(),
                         ) {
                             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("ðº", fontSize = 20.sp)
+                                Text("📺", fontSize = 20.sp)
                                 Spacer(Modifier.width(12.dp))
                                 Column {
                                     Text(d.name, fontWeight = FontWeight.SemiBold)
@@ -165,12 +165,12 @@ fun SenderScreen(onBack: () -> Unit) {
             OutlinedButton(
                 onClick = {
                     if (manualIp.isNotBlank() && manualPin.length == 6) {
-                        selected = Discovery.Beacon("Manuel baÄlantÄ±", manualIp.trim(), 47813, manualPin)
+                        selected = Discovery.Beacon("Manuel bağlantı", manualIp.trim(), 47813, manualPin)
                         error = null; doneMsg = null
                     }
                 },
                 modifier = Modifier.align(Alignment.End),
-            ) { Text("BaÄlan") }
+            ) { Text("Bağlan") }
 
             Spacer(Modifier.height(16.dp))
 
@@ -178,7 +178,7 @@ fun SenderScreen(onBack: () -> Unit) {
                 onClick = { picker.launch(arrayOf("*/*")) },
                 enabled = !sending,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) { Text(if (picked.isEmpty()) "Dosya SeÃ§" else picked.size.toString() + " dosya seÃ§ildi â deÄiÅtir") }
+            ) { Text(if (picked.isEmpty()) "Dosya Seç" else picked.size.toString() + " dosya seçildi — değiştir") }
 
             Spacer(Modifier.height(8.dp))
             Button(
@@ -188,7 +188,7 @@ fun SenderScreen(onBack: () -> Unit) {
             ) {
                 Icon(Icons.Filled.Send, null)
                 Spacer(Modifier.width(8.dp))
-                Text(if (selected == null) "Ãnce cihaz seÃ§" else "GÃNDER", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(if (selected == null) "Önce cihaz seç" else "GÖNDER", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
             progress?.let { p ->
@@ -199,7 +199,7 @@ fun SenderScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 )
                 Text(
-                    formatSize(p.bytes) + " / " + formatSize(p.total) + "  â¢  " + formatSpeed(p.speedBps),
+                    formatSize(p.bytes) + " / " + formatSize(p.total) + "  •  " + formatSpeed(p.speedBps),
                     fontSize = 13.sp,
                 )
             }
@@ -210,7 +210,7 @@ fun SenderScreen(onBack: () -> Unit) {
             }
             error?.let {
                 Spacer(Modifier.height(8.dp))
-                Text("â  " + it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                Text("⚠ " + it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
             }
         }
     }

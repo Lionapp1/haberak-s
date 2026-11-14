@@ -14,6 +14,8 @@ import android.view.SurfaceView
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -25,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -116,6 +119,20 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
         }
     }
 
+    val mirrorScanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        result.contents?.let { contents ->
+            val match = Regex("filebeam-mirror://([0-9.]+):([0-9]+)#([0-9]{6})").find(contents)
+            if (match != null) {
+                host = match.groupValues[1]
+                pinInput = match.groupValues[3]
+                SettingsStore.saveMirrorPair(context, host, pinInput)
+                status = "TV QR koduyla eşleştirildi"
+            } else {
+                status = "Yansıtma QR kodu tanınmadı"
+            }
+        }
+    }
+
     val projectionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
             SettingsStore.saveMirrorPair(context, host.trim(), pinInput)
@@ -156,10 +173,10 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
                     }
                 }
             )
-            Surface(
-                modifier = Modifier.align(Alignment.TopStart).padding(22.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                shape = RoundedCornerShape(18.dp),
+            if (!active) Surface(
+                modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+                shape = RoundedCornerShape(26.dp),
             ) {
                 Row(
                     Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
@@ -169,13 +186,18 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri · çıkış", tint = MaterialTheme.colorScheme.onSurface)
                     }
-                    Column {
-                        Text(if (active) "FILEBEAM · CANLI YAYIN" else "FILEBEAM · TV HAZIR", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                        Text(if (active) status else "Telefonunda görünen TV'yi seç ve PIN'i gir", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                        if (!active) {
-                            Text("PIN  $tvPin", color = MaterialTheme.colorScheme.primary, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 5.sp)
-                            Text(Discovery.localIp(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("FILEBEAM · TV HAZIR", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                        Text("Telefon kamerasıyla QR kodu okut", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                        Spacer(Modifier.height(12.dp))
+                        QrImage(
+                            content = "filebeam-mirror://" + Discovery.localIp() + ":" + ScreenMirrorService.MIRROR_PORT + "#" + tvPin,
+                            modifier = Modifier.size(190.dp).background(Color.White, RoundedCornerShape(14.dp)).padding(8.dp),
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text("PIN  $tvPin", color = MaterialTheme.colorScheme.primary, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 5.sp)
+                        Text(Discovery.localIp() + ":" + ScreenMirrorService.MIRROR_PORT, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                        Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     }
                 }
             }
@@ -201,6 +223,13 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
                     },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") } },
                     actions = {
+                        if (!isTv) IconButton(onClick = {
+                            mirrorScanLauncher.launch(
+                                ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                    .setPrompt("TV ekranındaki yansıtma QR kodunu okut")
+                                    .setBeepEnabled(false).setOrientationLocked(true)
+                            )
+                        }) { Icon(Icons.Filled.QrCodeScanner, contentDescription = "QR ile eşleştir") }
                         TextButton(onClick = {
                             context.startService(Intent(context, ScreenMirrorService::class.java).setAction(ScreenMirrorService.ACTION_STOP))
                             status = "Yansıtma durduruldu"
@@ -221,7 +250,7 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
                             Spacer(Modifier.width(12.dp))
                             Column {
                                 Text("Telefon ekranını TV'ye aktar", fontWeight = FontWeight.Bold)
-                                Text("TV otomatik bulunur. İlk eşleştirmeden sonra PIN hatırlanır.", style = MaterialTheme.typography.bodySmall)
+                                Text("TV otomatik bulunur. QR koduyla ilk eşleştirme yapılır; sonraki bağlantılarda PIN hatırlanır.", style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }

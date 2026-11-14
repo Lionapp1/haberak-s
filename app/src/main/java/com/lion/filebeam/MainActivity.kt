@@ -86,7 +86,7 @@ fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit, 
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text("FileBeam", fontWeight = FontWeight.Bold)
-                            Text("Yakınında. Hızlıca. Güvenle.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Yerel ağda hızlı ve güvenli aktarım", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 },
@@ -120,7 +120,7 @@ fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit, 
                     }
                     Spacer(Modifier.height(if (isTv) 28.dp else 22.dp))
                     Text(
-                        "Dosyaların özgürce\nışınlansın.",
+                        "Dosyalarını hızlıca\nve güvenle aktar.",
                         fontSize = if (isTv) 54.sp else if (wide) 38.sp else 30.sp,
                         lineHeight = if (isTv) 62.sp else if (wide) 44.sp else 36.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -128,7 +128,7 @@ fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit, 
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "Telefonunla TV arasında fotoğraf, video ve belgeleri güvenle aktar.",
+                        "Fotoğraf, video ve belgelerini telefonunla Android TV arasında doğrudan aktar.",
                         fontSize = if (isTv) 21.sp else 15.sp,
                         lineHeight = if (isTv) 30.sp else 22.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

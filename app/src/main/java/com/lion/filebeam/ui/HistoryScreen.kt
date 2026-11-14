@@ -25,7 +25,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.focus.focusable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lion.filebeam.TransferHistory
@@ -227,7 +226,7 @@ private fun HistoryRow(
 
     Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Row(
-            Modifier.fillMaxWidth().clickable { openFile() }.focusable().padding(horizontal = 10.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().clickable { openFile() }.padding(horizontal = 10.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Checkbox(checked = checked, onCheckedChange = onChecked)

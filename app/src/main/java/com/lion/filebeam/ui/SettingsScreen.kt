@@ -63,8 +63,8 @@ fun SettingsScreen(
                 description = "Ağ ve TV performansına göre görüntü profilini belirle."
             ) {
                 listOf(
-                    Triple("economy", "Akıcı · 720p / 24 FPS", "Daha düşük ağ kullanımı ve daha az yük."),
-                    Triple("balanced", "Dengeli · 1080p'ye kadar / 30 FPS", "Görüntü kalitesi ve akıcılık arasında denge."),
+                    Triple("economy", "Ekonomik · 540p / 24 FPS", "Zayıf Wi-Fi ve eski TV'lerde daha kararlı aktarım."),
+                    Triple("balanced", "Uyumlu · 720p / 30 FPS", "Daha net görüntü ve geniş Android TV uyumluluğu."),
                 ).forEach { (value, label, hint) ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f).padding(vertical = 7.dp)) {
@@ -75,7 +75,7 @@ fun SettingsScreen(
                     }
                 }
                 Text(
-                    "Değişiklikler sonraki yansıtma oturumunda uygulanır. Gerçek performans cihaz ve Wi-Fi ağına bağlıdır.",
+                    "Uyumluluk için H.264 Baseline kullanılır. Değişiklikler sonraki oturumda uygulanır; gerçek performans cihaz ve Wi-Fi ağına bağlıdır.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

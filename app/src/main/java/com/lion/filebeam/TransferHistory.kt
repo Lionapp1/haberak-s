@@ -16,6 +16,7 @@ data class TransferHistoryEntry(
     val uri: String,
     val size: Long,
     val timestamp: Long,
+    val direction: String = "received",
 )
 
 object TransferHistory {
@@ -35,6 +36,7 @@ object TransferHistory {
                     uri = item.optString("uri"),
                     size = item.optLong("size"),
                     timestamp = item.optLong("timestamp"),
+                    direction = item.optString("direction", "received"),
                 )
             }.sortedByDescending { it.timestamp }
         }.getOrDefault(emptyList())
@@ -42,19 +44,35 @@ object TransferHistory {
 
     @Synchronized
     fun delete(context: Context, entry: TransferHistoryEntry) {
+        // Deleting a sent-history row must never delete the user's original source file.
+        if (entry.direction != "sent") deleteStoredFile(context, entry.uri)
+        save(context, list(context).filterNot { it.uri == entry.uri && it.timestamp == entry.timestamp })
+    }
+
+    @Synchronized
+    fun deleteAll(context: Context, entries: List<TransferHistoryEntry>) {
+        entries.filter { it.direction != "sent" }.forEach { deleteStoredFile(context, it.uri) }
+        val keys = entries.map { it.uri to it.timestamp }.toSet()
+        save(context, list(context).filterNot { (it.uri to it.timestamp) in keys })
+    }
+
+    private fun deleteStoredFile(context: Context, rawUri: String) {
         runCatching {
-            val uri = Uri.parse(entry.uri)
+            val uri = Uri.parse(rawUri)
             if (uri.scheme == "content") context.contentResolver.delete(uri, null, null)
             else uri.path?.let { java.io.File(it).delete() }
         }
-        val remaining = list(context).filterNot { it.uri == entry.uri && it.timestamp == entry.timestamp }
+    }
+
+    private fun save(context: Context, entries: List<TransferHistoryEntry>) {
         val array = JSONArray()
-        remaining.forEach { item ->
+        entries.forEach { item ->
             array.put(JSONObject().apply {
                 put("name", item.name)
                 put("uri", item.uri)
                 put("size", item.size)
                 put("timestamp", item.timestamp)
+                put("direction", item.direction)
             })
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_ITEMS, array.toString()).apply()
@@ -62,18 +80,14 @@ object TransferHistory {
 
     @Synchronized
     fun record(context: Context, name: String, uri: Uri, size: Long) {
-        val items = list(context) + TransferHistoryEntry(name, uri.toString(), size, System.currentTimeMillis())
-        val array = JSONArray()
-        items.forEach { entry ->
-            array.put(JSONObject().apply {
-                put("name", entry.name)
-                put("uri", entry.uri)
-                put("size", entry.size)
-                put("timestamp", entry.timestamp)
-            })
-        }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_ITEMS, array.toString()).apply()
+        save(context, list(context) + TransferHistoryEntry(name, uri.toString(), size, System.currentTimeMillis(), "received"))
         showNotification(context, name, "FileBeam · Dosya alındı")
+    }
+
+    @Synchronized
+    fun recordSent(context: Context, name: String, uri: Uri, size: Long) {
+        save(context, list(context) + TransferHistoryEntry(name, uri.toString(), size, System.currentTimeMillis(), "sent"))
+        showNotification(context, name, "FileBeam · Gönderim tamamlandı")
     }
 
     fun notifySent(context: Context, name: String) {

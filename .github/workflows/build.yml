@@ -12,8 +12,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: filebeam-ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: filebeam-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-debug:

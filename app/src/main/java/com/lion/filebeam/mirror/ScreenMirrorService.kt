@@ -78,9 +78,10 @@ class ScreenMirrorService : Service() {
         socket = client
         client.tcpNoDelay = true
         client.keepAlive = true
+        client.sendBufferSize = 1024 * 1024
         client.connect(InetSocketAddress(host, MIRROR_PORT), 15000)
         client.soTimeout = 0
-        val out = DataOutputStream(BufferedOutputStream(client.getOutputStream(), 256 * 1024))
+        val out = DataOutputStream(BufferedOutputStream(client.getOutputStream(), 64 * 1024))
         out.writeUTF(pin)
         out.flush()
         publishStatus("TV bağlantısı kuruldu · görüntü hazırlanıyor")
@@ -100,28 +101,54 @@ class ScreenMirrorService : Service() {
         @Suppress("DEPRECATION")
         (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
         // Fixed 16:9 landscape output for TV panels.
-        val width = if (profile == "economy") 1280 else 1920
-        val height = if (profile == "economy") 720 else 1080
-        val fps = if (profile == "economy") 24 else 30
-        val bitrate = if (profile == "economy") 2_500_000 else 6_000_000
+        val (width, height, requestedFps, bitrate) = when (profile) {
+            "economy" -> listOf(1280, 720, 30, 2_500_000)
+            "smooth" -> listOf(1280, 720, 60, 4_500_000)
+            "performance" -> listOf(1280, 720, 90, 6_000_000)
+            else -> listOf(1920, 1080, 30, 6_000_000)
+        }
+        val fpsCandidates = when (requestedFps) {
+            90 -> listOf(90, 60, 30)
+            60 -> listOf(60, 30)
+            else -> listOf(30)
+        }
 
-        val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
-            setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
-            setInteger(MediaFormat.KEY_FRAME_RATE, fps)
-            setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-            // Baseline AVC is widely supported by older Android TV hardware decoders.
-            setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
-            if (Build.VERSION.SDK_INT >= 29) {
-                setInteger(MediaFormat.KEY_LATENCY, 1)
-                setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
+        var actualFps = 30
+        var codec: MediaCodec? = null
+        var selectedFormat: MediaFormat? = null
+        var lastConfigureError: Exception? = null
+        for (candidateFps in fpsCandidates) {
+            val candidateFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
+                setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+                setInteger(MediaFormat.KEY_BIT_RATE, bitrate)
+                setInteger(MediaFormat.KEY_FRAME_RATE, candidateFps)
+                setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
+                setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+                if (Build.VERSION.SDK_INT >= 29) {
+                    setInteger(MediaFormat.KEY_LATENCY, 1)
+                    setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
+                }
+            }
+            val candidate = try { MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC) }
+                catch (e: Exception) { lastConfigureError = e; null }
+            if (candidate != null) {
+                try {
+                    candidate.configure(candidateFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                    codec = candidate
+                    selectedFormat = candidateFormat
+                    actualFps = candidateFps
+                    break
+                } catch (e: Exception) {
+                    lastConfigureError = e
+                    runCatching { candidate.release() }
+                }
             }
         }
-        val codec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-        encoder = codec
-        codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        val activeCodec = codec ?: throw IllegalStateException("Bu cihazda yansıtma kodlayıcısı başlatılamadı", lastConfigureError)
+        encoder = activeCodec
+        val format = selectedFormat ?: error("Video profili seçilemedi")
         val inputSurface = codec.createInputSurface()
-        codec.start()
+        activeCodec.start()
         virtualDisplay = projection?.createVirtualDisplay(
             "FileBeam Screen Mirror", width, height, metrics.densityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, inputSurface, null, null
@@ -130,10 +157,11 @@ class ScreenMirrorService : Service() {
         val info = MediaCodec.BufferInfo()
         var sentFormat = false
         var audioStarted = false
+        publishStatus("Yansıtma hazırlanıyor · ${width}×${height} · ${actualFps} FPS")
         while (running) {
-            when (val index = codec.dequeueOutputBuffer(info, 10_000)) {
+            when (val index = activeCodec.dequeueOutputBuffer(info, 5_000)) {
                 MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                    val outputFormat = codec.outputFormat
+                    val outputFormat = activeCodec.outputFormat
                     val sps = outputFormat.getByteBuffer("csd-0")?.copyBytes() ?: ByteArray(0)
                     val pps = outputFormat.getByteBuffer("csd-1")?.copyBytes() ?: ByteArray(0)
                     check(sps.isNotEmpty() && pps.isNotEmpty()) { "H.264 kodlayıcı SPS/PPS bilgisi üretmedi" }
@@ -156,7 +184,7 @@ class ScreenMirrorService : Service() {
                 MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
                 else -> if (index >= 0) {
                     try {
-                        val buffer = codec.getOutputBuffer(index)
+                        val buffer = activeCodec.getOutputBuffer(index)
                         if (buffer != null && info.size > 0 && sentFormat &&
                             info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
                             val bytes = ByteArray(info.size)
@@ -173,7 +201,7 @@ class ScreenMirrorService : Service() {
                             }
                         }
                     } finally {
-                        codec.releaseOutputBuffer(index, false)
+                        activeCodec.releaseOutputBuffer(index, false)
                     }
                 }
             }
@@ -202,7 +230,7 @@ class ScreenMirrorService : Service() {
                 val pcm = ByteArray(maxOf(minBuffer, 8192))
                 while (running && audioRecord === record) {
                     val count = record.read(pcm, 0, pcm.size)
-                    if (count > 0) synchronized(out) { out.writeInt(PACKET_AUDIO); out.writeInt(count); out.write(pcm, 0, count); out.flush() }
+                    if (count > 0) synchronized(out) { out.writeInt(PACKET_AUDIO); out.writeInt(count); out.write(pcm, 0, count) }
                     else if (count < 0) break
                 }
             }

@@ -14,7 +14,7 @@ object SettingsStore {
     private const val PAIRED_MIRROR_PIN = "paired_mirror_pin"
 
     fun themeMode(context: Context): String =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(THEME, "system") ?: "system"
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(THEME, "dark") ?: "dark"
 
     fun setThemeMode(context: Context, value: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(THEME, value).apply()

@@ -120,14 +120,18 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF_NAME#v}"
             VERSION="${VERSION%%-*}"
-            IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
-            MAJOR="${MAJOR:-0}"; MINOR="${MINOR:-0}"; PATCH="${PATCH:-0}"
-            if ! [[ "$MAJOR$MINOR$PATCH" =~ ^[0-9]+$ ]]; then echo "Invalid release tag: $GITHUB_REF_NAME"; exit 1; fi
-            VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))
-            gradle assembleRelease -PVERSION_NAME="$VERSION" -PVERSION_CODE="$VERSION_CODE" --stacktrace
           else
-            gradle assembleRelease --stacktrace
+            # Every CI build gets a strictly increasing version so Android accepts it as an update.
+            VERSION="2.0.${GITHUB_RUN_NUMBER}"
           fi
+          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
+          MAJOR="${MAJOR:-0}"; MINOR="${MINOR:-0}"; PATCH="${PATCH:-0}"
+          if ! [[ "$MAJOR$MINOR$PATCH" =~ ^[0-9]+$ ]]; then echo "Invalid release version: $VERSION"; exit 1; fi
+          VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))
+          echo "VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "Building FileBeam $VERSION (versionCode $VERSION_CODE)"
+          gradle assembleRelease -PVERSION_NAME="$VERSION" -PVERSION_CODE="$VERSION_CODE" --stacktrace
           APK="app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
           apksigner verify --verbose --print-certs "$APK"
@@ -144,15 +148,16 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish APK to GitHub Release
-        if: github.event_name == 'push' && steps.signing.outputs.available == 'true'
+      - name: Publish versioned APK to GitHub Release
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && steps.signing.outputs.available == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'nightly' }}
+          # Branch builds publish a new stable semver tag; /releases/latest can then find it.
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v2.0.{0}', github.run_number) }}
           target_commitish: ${{ github.sha }}
-          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('FileBeam {0}', github.ref_name) || 'FileBeam Nightly' }}
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-          make_latest: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('FileBeam {0}', github.ref_name) || format('FileBeam 2.0.{0}', github.run_number) }}
+          prerelease: false
+          make_latest: true
           generate_release_notes: true
           overwrite_files: true
           fail_on_unmatched_files: true

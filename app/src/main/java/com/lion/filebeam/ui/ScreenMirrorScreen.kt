@@ -148,6 +148,17 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
         } else status = "Ekran paylaşım izni verilmedi"
     }
 
+    val audioPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            projectionLauncher.launch(manager.createScreenCaptureIntent())
+        } else {
+            status = "Ses izni verilmedi · görüntü aktarımı yine başlatılabilir"
+            val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            projectionLauncher.launch(manager.createScreenCaptureIntent())
+        }
+    }
+
     if (isTv) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             AndroidView(
@@ -297,8 +308,14 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
                 item {
                     Button(
                         onClick = {
-                            val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                            projectionLauncher.launch(manager.createScreenCaptureIntent())
+                            if (android.os.Build.VERSION.SDK_INT >= 29 &&
+                                ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                audioPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                            } else {
+                                val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                                projectionLauncher.launch(manager.createScreenCaptureIntent())
+                            }
                         },
                         enabled = host.isNotBlank() && pinInput.length == 6 && activity != null,
                         modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -311,7 +328,7 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
                 item {
                     Text(status, color = MaterialTheme.colorScheme.primary)
                     Text(
-                        "Android'in ekran paylaşımı izni gerekir. Bildirimler ve hassas içerikler de TV'de görünebilir.",
+                        "Görüntü ve desteklenen uygulama sesleri TV'ye aktarılır. Android ekran ve ses izinleri gerekir; bazı uygulamalar ses paylaşımını engelleyebilir.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

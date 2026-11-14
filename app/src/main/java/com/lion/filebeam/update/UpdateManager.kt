@@ -61,6 +61,7 @@ object UpdateManager {
                 if (name.endsWith(".apk.sha256", ignoreCase = true) || name.endsWith(".sha256", ignoreCase = true)) checksum = asset
             }
             val selected = apk ?: throw IllegalStateException("Bu sürümde indirilebilir APK bulunamadı.")
+            val checksumAsset = checksum ?: throw IllegalStateException("Release içinde APK SHA-256 doğrulama dosyası bulunamadı.")
             ReleaseInfo(
                 version = tag,
                 title = release.optString("name").ifBlank { "FileBeam $tag" },
@@ -68,7 +69,8 @@ object UpdateManager {
                 pageUrl = release.optString("html_url"),
                 apkUrl = selected.optString("browser_download_url"),
                 apkName = selected.optString("name").ifBlank { "FileBeam-update.apk" },
-                checksumUrl = checksum?.optString("browser_download_url")?.takeIf { it.isNotBlank() },
+                checksumUrl = checksumAsset.optString("browser_download_url").takeIf { it.isNotBlank() }
+                    ?: throw IllegalStateException("SHA-256 doğrulama bağlantısı eksik."),
             )
         } finally {
             connection.disconnect()
@@ -84,13 +86,15 @@ object UpdateManager {
         val apkFile = File(target, "FileBeam-${release.version}.apk")
         download(release.apkUrl, apkFile, onProgress)
         release.checksumUrl?.let { checksumUrl ->
-            val expected = readText(checksumUrl).trim().substringBefore(' ').lowercase()
-            if (expected.matches(Regex("[a-f0-9]{64}"))) {
-                val actual = sha256(apkFile)
-                if (!actual.equals(expected, ignoreCase = true)) {
-                    apkFile.delete()
-                    throw IllegalStateException("İndirilen dosyanın SHA-256 doğrulaması başarısız.")
-                }
+            val expected = readText(checksumUrl).trim().substringBefore(Regex("\\s")).lowercase()
+            if (!expected.matches(Regex("[a-f0-9]{64}"))) {
+                apkFile.delete()
+                throw IllegalStateException("Release SHA-256 dosyası hatalı.")
+            }
+            val actual = sha256(apkFile)
+            if (!actual.equals(expected, ignoreCase = true)) {
+                apkFile.delete()
+                throw IllegalStateException("İndirilen dosyanın SHA-256 doğrulaması başarısız.")
             }
         }
         withContext(Dispatchers.Main) {
@@ -150,7 +154,8 @@ object UpdateManager {
             setRequestProperty("User-Agent", "FileBeam-Android")
         }
         return try {
-            if (connection.responseCode !in 200..299) "" else connection.inputStream.bufferedReader().use { it.readText() }
+            if (connection.responseCode !in 200..299) throw IllegalStateException("SHA-256 dosyası indirilemedi: HTTP ${connection.responseCode}")
+            connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
             connection.disconnect()
         }

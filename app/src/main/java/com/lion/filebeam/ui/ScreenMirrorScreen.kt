@@ -3,13 +3,16 @@
 package com.lion.filebeam.ui
 
 import android.app.Activity
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.WindowManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -57,6 +60,23 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
     val devices = remember { mutableStateListOf<Discovery.Beacon>() }
     val tvPin = remember { SettingsStore.mirrorPin(context) }
     var active by remember { mutableStateOf(false) }
+
+    DisposableEffect(context) {
+        val statusReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                intent?.getStringExtra(ScreenMirrorService.EXTRA_STATUS)?.let { status = it }
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            statusReceiver,
+            IntentFilter(ScreenMirrorService.ACTION_STATUS),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose { runCatching { context.unregisterReceiver(statusReceiver) } }
+    }
+
+    BackHandler(enabled = isTv, onBack = onBack)
 
     DisposableEffect(activity, isTv) {
         val window = activity?.window
@@ -138,7 +158,7 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
             )
             Surface(
                 modifier = Modifier.align(Alignment.TopStart).padding(22.dp),
-                color = Color(0xCC10141C),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
                 shape = RoundedCornerShape(18.dp),
             ) {
                 Row(
@@ -147,14 +167,14 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Çıkış", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri · çıkış", tint = MaterialTheme.colorScheme.onSurface)
                     }
                     Column {
-                        Text(if (active) "FILEBEAM · CANLI YAYIN" else "FILEBEAM · TV HAZIR", color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(if (active) status else "Telefonunda görünen TV'yi seç ve PIN'i gir", color = Color(0xFFCFD8E3), fontSize = 12.sp)
+                        Text(if (active) "FILEBEAM · CANLI YAYIN" else "FILEBEAM · TV HAZIR", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                        Text(if (active) status else "Telefonunda görünen TV'yi seç ve PIN'i gir", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                         if (!active) {
-                            Text("PIN  $tvPin", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 5.sp)
-                            Text(Discovery.localIp(), color = Color(0xFFCFD8E3), fontSize = 12.sp)
+                            Text("PIN  $tvPin", color = MaterialTheme.colorScheme.primary, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 5.sp)
+                            Text(Discovery.localIp(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                         }
                     }
                 }
@@ -162,10 +182,10 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
             if (!active) {
                 Surface(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp),
-                    color = Color(0xAA10141C),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
                     shape = RoundedCornerShape(50),
                 ) {
-                    Text("Telefon ve TV aynı Wi-Fi ağına bağlı olmalı", color = Color.White, modifier = Modifier.padding(horizontal = 20.dp, vertical = 11.dp))
+                    Text("Telefon ve TV aynı Wi-Fi ağına bağlı olmalı", color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 20.dp, vertical = 11.dp))
                 }
             }
         }

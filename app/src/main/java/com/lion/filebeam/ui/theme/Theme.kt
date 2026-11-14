@@ -12,7 +12,12 @@ import androidx.compose.ui.unit.dp
 // Tek marka paleti: telefon, tablet ve Android TV bütün ekranlarda aynı semantik renkleri kullanır.
 private val BeamBlue = Color(0xFF246BCE)
 private val BeamCyan = Color(0xFF55D6E8)
-private val FileBeamShapes = Shapes(\n    small = RoundedCornerShape(10.dp),\n    medium = RoundedCornerShape(16.dp),\n    large = RoundedCornerShape(24.dp),\n)\nprivate val LightColors = lightColorScheme(
+private val FileBeamShapes = Shapes(
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
+)
+private val LightColors = lightColorScheme(
     primary = BeamBlue,
     onPrimary = Color.White,
     primaryContainer = Color(0xFFDCE9FF),

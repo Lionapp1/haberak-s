@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,7 +75,11 @@ fun SettingsScreen(
                     Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                         Surface(shape = RoundedCornerShape(17.dp), color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(54.dp)) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text("F", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Black, fontSize = 30.sp)
+                                Image(
+                                    painter = painterResource(id = com.lion.filebeam.R.drawable.ic_launcher_foreground),
+                                    contentDescription = "FileBeam",
+                                    modifier = Modifier.fillMaxSize().padding(7.dp),
+                                )
                             }
                         }
                         Spacer(Modifier.width(14.dp))

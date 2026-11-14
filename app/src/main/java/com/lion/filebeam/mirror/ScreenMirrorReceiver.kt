@@ -11,6 +11,8 @@ import java.io.DataInputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 class ScreenMirrorReceiver(
@@ -23,6 +25,8 @@ class ScreenMirrorReceiver(
     @Volatile private var client: Socket? = null
     @Volatile private var decoder: MediaCodec? = null
     @Volatile private var audioTrack: AudioTrack? = null
+    @Volatile private var audioQueue: ArrayBlockingQueue<ByteArray>? = null
+    @Volatile private var audioPlaybackRunning = false
 
     fun start() {
         if (!surface.isValid || !running.compareAndSet(false, true)) return
@@ -101,7 +105,24 @@ class ScreenMirrorReceiver(
                             .setTransferMode(AudioTrack.MODE_STREAM).build()
                         if (track.state == AudioTrack.STATE_INITIALIZED) {
                             audioTrack = track
+                            val queue = ArrayBlockingQueue<ByteArray>(24)
+                            audioQueue = queue
+                            audioPlaybackRunning = true
                             track.play()
+                            thread(name = "FileBeam-tv-audio") {
+                                while (audioPlaybackRunning && running.get()) {
+                                    val chunk = try { queue.poll(250, TimeUnit.MILLISECONDS) } catch (_: InterruptedException) { null }
+                                        ?: continue
+                                    var offset = 0
+                                    while (offset < chunk.size && audioPlaybackRunning) {
+                                        val written = runCatching {
+                                            track.write(chunk, offset, chunk.size - offset, AudioTrack.WRITE_BLOCKING)
+                                        }.getOrDefault(-1)
+                                        if (written <= 0) break
+                                        offset += written
+                                    }
+                                }
+                            }
                         } else track.release()
                     }
                 }
@@ -110,7 +131,11 @@ class ScreenMirrorReceiver(
                     require(size in 1..262144) { "Ses paketi boyutu geçersiz" }
                     val pcm = ByteArray(size)
                     input.readFully(pcm)
-                    audioTrack?.write(pcm, 0, pcm.size, AudioTrack.WRITE_BLOCKING)
+                    val queue = audioQueue
+                    if (queue != null && !queue.offer(pcm)) {
+                        queue.poll()
+                        queue.offer(pcm)
+                    }
                 }
                 PACKET_VIDEO -> {
                     val size = input.readInt()
@@ -140,9 +165,17 @@ class ScreenMirrorReceiver(
     }
 
     private fun releaseAudio() {
+        audioPlaybackRunning = false
+        audioQueue?.clear()
+        audioQueue = null
         val track = audioTrack
         audioTrack = null
-        if (track != null) { runCatching { track.pause() }; runCatching { track.flush() }; runCatching { track.stop() }; runCatching { track.release() } }
+        if (track != null) {
+            runCatching { track.pause() }
+            runCatching { track.flush() }
+            runCatching { track.stop() }
+            runCatching { track.release() }
+        }
     }
 
     private fun releaseDecoder() {

@@ -73,6 +73,8 @@ class ScreenMirrorReceiver(
         decoder = codec
         codec.configure(format, surface, null, 0)
         codec.start()
+        // Keep the source aspect ratio; never stretch a portrait phone frame across a 16:9 TV.
+        codec.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT)
         onStatus("Görüntü alınıyor · ${width}×${height}")
 
         val info = MediaCodec.BufferInfo()

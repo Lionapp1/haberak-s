@@ -106,9 +106,9 @@ fun UpdateScreen(onBack: () -> Unit) {
                                     try {
                                         UpdateManager.downloadAndInstall(context, latest) { progress = it }
                                         status = "Kurulum ekranı açıldı."
-                                    } catch (_: InstallPermissionRequiredException) {
-                                        status = "İzin ekranını açtım. İzni verdikten sonra tekrar kurulum yap."
-                                        error = "Android ayarlarında FileBeam için uygulama yükleme iznini etkinleştir."
+                                    } catch (e: InstallPermissionRequiredException) {
+                                        status = "Kurulum izni gerekiyor. İzni verdikten sonra tekrar İndir ve kur'a dokun."
+                                        error = e.message
                                     } catch (e: Exception) {
                                         error = e.message ?: "Güncelleme indirilemedi."
                                         status = "Güncelleme tamamlanamadı."

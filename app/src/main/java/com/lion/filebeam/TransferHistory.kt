@@ -73,10 +73,14 @@ object TransferHistory {
             })
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_ITEMS, array.toString()).apply()
-        showNotification(context, name)
+        showNotification(context, name, "FileBeam · Dosya alındı")
     }
 
-    private fun showNotification(context: Context, name: String) {
+    fun notifySent(context: Context, name: String) {
+        showNotification(context, name, "FileBeam · Gönderim tamamlandı")
+    }
+
+    private fun showNotification(context: Context, name: String, title: String) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) return
@@ -95,7 +99,7 @@ object TransferHistory {
         }
         val notification = builder
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("FileBeam · Dosya alındı")
+            .setContentTitle(title)
             .setContentText(name)
             .setAutoCancel(true)
             .build()

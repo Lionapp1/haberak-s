@@ -54,7 +54,6 @@ fun SenderScreen(onBack: () -> Unit) {
     val isTv = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
     val scope = rememberCoroutineScope()
     val devices = remember { mutableStateListOf<Discovery.Beacon>() }
-    var selected by remember { mutableStateOf<Discovery.Beacon?>(null) }
     var picked by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var progress by remember { mutableStateOf<TransferClient.Progress?>(null) }
     var sending by remember { mutableStateOf(false) }
@@ -63,8 +62,17 @@ fun SenderScreen(onBack: () -> Unit) {
     var externalMessage by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var doneMsg by remember { mutableStateOf<String?>(null) }
-    var manualIp by remember { mutableStateOf("") }
-    var manualPin by remember { mutableStateOf("") }
+    var manualIp by remember { mutableStateOf(SettingsStore.savedTransferIp(context)) }
+    var manualPin by remember { mutableStateOf(SettingsStore.savedTransferPin(context)) }
+    var selected by remember {
+        val savedIp = SettingsStore.savedTransferIp(context)
+        val savedPin = SettingsStore.savedTransferPin(context)
+        mutableStateOf(
+            if (savedIp.isNotBlank() && savedPin.length == 6) {
+                Discovery.Beacon("Kayıtlı cihaz", savedIp, Discovery.TCP_PORT, savedPin)
+            } else null
+        )
+    }
     val listenJob = remember { mutableStateOf<Job?>(null) }
 
     DisposableEffect(Unit) {
@@ -99,6 +107,8 @@ fun SenderScreen(onBack: () -> Unit) {
         result.contents?.let { c ->
             Regex("filebeam://([0-9.]+):([0-9]+)#([0-9]+)").find(c)?.let { m ->
                 SettingsStore.saveTransferPair(context, m.groupValues[1], m.groupValues[3])
+                manualIp = m.groupValues[1]
+                manualPin = m.groupValues[3]
                 selected = Discovery.Beacon("QR ile bağlanıldı", m.groupValues[1], m.groupValues[2].toInt(), m.groupValues[3])
                 error = null
                 doneMsg = null
@@ -319,7 +329,21 @@ fun SenderScreen(onBack: () -> Unit) {
             }
             item {
                 SectionCard {
-                    Text("Manuel bağlantı", fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 20.sp else 16.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Bağlantı bilgileri", fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 20.sp else 16.sp)
+                            Text(
+                                if (selected?.pin?.length == 6) "Cihaz eşleştirildi · bilgiler bu telefonda kayıtlı" else "TV IP adresi ve PIN'i bir kez kaydet",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        if (selected?.pin?.length == 6) {
+                            Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer) {
+                                Text("KAYITLI", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
                     OutlinedTextField(
                         value = manualIp,
@@ -344,15 +368,29 @@ fun SenderScreen(onBack: () -> Unit) {
                     OutlinedButton(
                         onClick = {
                             if (manualIp.isNotBlank() && manualPin.length == 6) {
-                                SettingsStore.saveTransferPair(context, manualIp.trim(), manualPin)
-                                selected = Discovery.Beacon("Manuel bağlantı", manualIp.trim(), 47813, manualPin)
+                                val cleanIp = manualIp.trim()
+                                SettingsStore.saveTransferPair(context, cleanIp, manualPin)
+                                manualIp = cleanIp
+                                selected = Discovery.Beacon("Kayıtlı cihaz", cleanIp, Discovery.TCP_PORT, manualPin)
                                 error = null
                                 doneMsg = null
                             }
                         },
                         enabled = manualIp.isNotBlank() && manualPin.length == 6,
                         modifier = Modifier.fillMaxWidth().height(if (isTv) 58.dp else 46.dp),
-                    ) { Text("Bu cihaza bağlan") }
+                    ) { Text(if (selected?.ip == manualIp.trim() && selected?.pin == manualPin) "Bağlantıyı güncelle" else "Cihazı kaydet ve bağlan") }
+                    if (SettingsStore.savedTransferIp(context).isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                SettingsStore.clearTransferPair(context)
+                                manualIp = ""
+                                manualPin = ""
+                                selected = null
+                                autoSendPending = false
+                            },
+                            modifier = Modifier.align(Alignment.End),
+                        ) { Text("Kayıtlı cihazı unut") }
+                    }
                 }
             }
             item {

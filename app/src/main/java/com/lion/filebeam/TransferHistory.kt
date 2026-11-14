@@ -41,6 +41,26 @@ object TransferHistory {
     }
 
     @Synchronized
+    fun delete(context: Context, entry: TransferHistoryEntry) {
+        runCatching {
+            val uri = Uri.parse(entry.uri)
+            if (uri.scheme == "content") context.contentResolver.delete(uri, null, null)
+            else uri.path?.let { java.io.File(it).delete() }
+        }
+        val remaining = list(context).filterNot { it.uri == entry.uri && it.timestamp == entry.timestamp }
+        val array = JSONArray()
+        remaining.forEach { item ->
+            array.put(JSONObject().apply {
+                put("name", item.name)
+                put("uri", item.uri)
+                put("size", item.size)
+                put("timestamp", item.timestamp)
+            })
+        }
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_ITEMS, array.toString()).apply()
+    }
+
+    @Synchronized
     fun record(context: Context, name: String, uri: Uri, size: Long) {
         val items = list(context) + TransferHistoryEntry(name, uri.toString(), size, System.currentTimeMillis())
         val array = JSONArray()

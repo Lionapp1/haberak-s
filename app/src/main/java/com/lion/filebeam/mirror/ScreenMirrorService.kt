@@ -127,10 +127,9 @@ class ScreenMirrorService : Service() {
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, inputSurface, null, null
         ) ?: error("Sanal ekran oluşturulamadı")
 
-        val audioStarted = startAudioCapture(projection!!, out)
-        publishStatus(if (audioStarted) "Görüntü ve uygulama sesi aktarılıyor · ${width}×${height}" else "Görüntü aktarılıyor · ${width}×${height} · Ses izni yok veya uygulama sesi engelliyor")
         val info = MediaCodec.BufferInfo()
         var sentFormat = false
+        var audioStarted = false
         while (running) {
             when (val index = codec.dequeueOutputBuffer(info, 10_000)) {
                 MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
@@ -149,6 +148,10 @@ class ScreenMirrorService : Service() {
                         out.flush()
                     }
                     sentFormat = true
+                    if (!audioStarted) {
+                        audioStarted = startAudioCapture(projection!!, out)
+                        publishStatus(if (audioStarted) "Görüntü ve uygulama sesi aktarılıyor · ${width}×${height}" else "Görüntü aktarılıyor · ${width}×${height} · Ses izni yok veya uygulama sesi engelliyor")
+                    }
                 }
                 MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
                 else -> if (index >= 0) {

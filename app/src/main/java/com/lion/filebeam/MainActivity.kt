@@ -39,6 +39,7 @@ import com.lion.filebeam.ui.SettingsScreen
 import com.lion.filebeam.ui.HistoryScreen
 import com.lion.filebeam.ui.UpdateScreen
 import com.lion.filebeam.ui.theme.FileBeamTheme
+import com.lion.filebeam.update.UpdateManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity() {
                         onMirror = { mode = "mirror" },
                         onSettings = { mode = "settings" },
                         onHistory = { mode = "history" },
+                        onUpdates = { mode = "updates" },
                     )
                 }
             }
@@ -76,8 +78,12 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit, onSettings: () -> Unit, onHistory: () -> Unit) {
+fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit, onSettings: () -> Unit, onHistory: () -> Unit, onUpdates: () -> Unit) {
     val context = LocalContext.current
+    var updateVersion by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        try { updateVersion = UpdateManager.check(context)?.version } catch (_: Exception) { /* Keep the home screen available when offline. */ }
+    }
     val isTv = remember {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
     }
@@ -134,6 +140,22 @@ fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit, 
                         )
                     }
                     Spacer(Modifier.height(if (isTv) 28.dp else 22.dp))
+                    updateVersion?.let { version ->
+                        Card(
+                            onClick = onUpdates,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                        ) {
+                            Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Yeni FileBeam sürümü hazır", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    Text("Sürüm $version · Ayrıntıları görüntüle", color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.bodySmall)
+                                }
+                                Text("GÜNCELLE", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 12.sp)
+                            }
+                        }
+                        Spacer(Modifier.height(18.dp))
+                    }
                     Text(
                         "Dosyalarını hızlıca\nve güvenle aktar.",
                         fontSize = if (isTv) 54.sp else if (wide) 38.sp else 30.sp,

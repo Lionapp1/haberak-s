@@ -2,7 +2,11 @@
 
 package com.lion.filebeam.ui
 
+import android.content.ClipData
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.ActivityNotFoundException
+import android.widget.Toast
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -81,6 +86,36 @@ fun SenderScreen(onBack: () -> Unit) {
             } ?: run { error = "QR anlaşılamadı" }
         }
     }
+    fun shareWithOtherApps() {
+        if (picked.isEmpty()) return
+        try {
+            val shareIntent = if (picked.size == 1) {
+                Intent(Intent.ACTION_SEND).apply {
+                    type = context.contentResolver.getType(picked.first()) ?: "*/*"
+                    putExtra(Intent.EXTRA_STREAM, picked.first())
+                    clipData = ClipData.newUri(context.contentResolver, "FileBeam", picked.first())
+                }
+            } else {
+                Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                    type = "*/*"
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(picked))
+                    val clip = ClipData.newUri(context.contentResolver, "FileBeam", picked.first())
+                    picked.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+                    clipData = clip
+                }
+            }.apply {
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(
+                Intent.createChooser(shareIntent, "Dosyaları hangi uygulamayla göndermek istiyorsun?")
+            )
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, "Bu dosyaları paylaşabilecek bir uygulama bulunamadı.", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(context, e.message ?: "Paylaşım başlatılamadı.", Toast.LENGTH_LONG).show()
+        }
+    }
+
     fun startSend() {
         val dev = selected ?: return
         if (picked.isEmpty()) return
@@ -240,6 +275,21 @@ fun SenderScreen(onBack: () -> Unit) {
                         Spacer(Modifier.width(9.dp))
                         Text(if (sending) "Gönderiliyor…" else "Gönderimi başlat", fontWeight = FontWeight.Bold, fontSize = if (isTv) 19.sp else 15.sp)
                     }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { shareWithOtherApps() },
+                        enabled = picked.isNotEmpty() && !sending,
+                        modifier = Modifier.fillMaxWidth().height(if (isTv) 58.dp else 48.dp),
+                    ) {
+                        Icon(Icons.Filled.Share, null)
+                        Spacer(Modifier.width(9.dp))
+                        Text("Diğer uygulamayla paylaş", fontWeight = FontWeight.SemiBold)
+                    }
+                    Text(
+                        "Paylaşım listesinde Send Files to TV görünüyorsa seçerek dosyayı o uygulamaya aktarabilirsin.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
             if (progress != null) {

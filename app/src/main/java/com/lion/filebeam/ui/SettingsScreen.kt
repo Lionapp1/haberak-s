@@ -110,8 +110,10 @@ fun SettingsScreen(
                     description = "Ağ ve TV performansına göre görüntü profilini belirle."
                 ) {
                     listOf(
-                        Triple("economy", "Ekonomik · 540p / 24 FPS", "Zayıf Wi-Fi ve eski TV'ler için daha hafif."),
-                        Triple("balanced", "Uyumlu · 720p / 30 FPS", "Görüntü kalitesi ve uyumluluk dengesi."),
+                        Triple("economy", "Ekonomik · 720p / 30 FPS", "Zayıf Wi-Fi ve eski TV'ler için düşük yük."),
+                        Triple("balanced", "Kalite · 1080p / 30 FPS", "Daha yüksek çözünürlük, dengeli kare hızı."),
+                        Triple("smooth", "Akıcı · 720p / 60 FPS", "Hareketli görüntüler için daha akıcı seçenek."),
+                        Triple("performance", "Maksimum · 720p / 90 FPS", "Cihaz destekliyorsa 90 FPS; desteklemezse otomatik 60/30 FPS."),
                     ).forEach { (value, label, hint) ->
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f).padding(vertical = 7.dp)) {
@@ -122,7 +124,7 @@ fun SettingsScreen(
                         }
                     }
                     Text(
-                        "H.264 kodlama kullanılır. Değişiklikler sonraki yansıtma oturumunda uygulanır.",
+                        "H.264 düşük gecikmeli kodlama kullanılır. 60/90 FPS donanım ve Wi-Fi kapasitesine bağlıdır; desteklenmeyen hız otomatik olarak düşürülür. Değişiklikler sonraki oturumda uygulanır.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

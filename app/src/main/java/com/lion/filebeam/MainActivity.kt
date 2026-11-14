@@ -10,6 +10,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -98,7 +100,11 @@ fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit, 
                             modifier = Modifier.size(38.dp),
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text("F", fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onPrimary, fontSize = 23.sp)
+                                Image(
+                                    painter = painterResource(id = com.lion.filebeam.R.drawable.ic_launcher_foreground),
+                                    contentDescription = "FileBeam",
+                                    modifier = Modifier.fillMaxSize().padding(5.dp),
+                                )
                             }
                         }
                         Spacer(Modifier.width(12.dp))

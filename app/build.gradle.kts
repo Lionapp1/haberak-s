@@ -21,8 +21,8 @@ android {
         applicationId = "com.lion.filebeam"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "2.0.0"
+        versionCode = providers.gradleProperty("VERSION_CODE").orElse("2").get().toInt()
+        versionName = providers.gradleProperty("VERSION_NAME").orElse("2.0.0").get()
     }
 
     signingConfigs {

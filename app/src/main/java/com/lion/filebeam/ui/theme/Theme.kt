@@ -1,15 +1,18 @@
 package com.lion.filebeam.ui.theme
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.dp
 
 // Tek marka paleti: telefon, tablet ve Android TV bütün ekranlarda aynı semantik renkleri kullanır.
 private val BeamBlue = Color(0xFF246BCE)
 private val BeamCyan = Color(0xFF55D6E8)
-private val LightColors = lightColorScheme(
+private val FileBeamShapes = Shapes(\n    small = RoundedCornerShape(10.dp),\n    medium = RoundedCornerShape(16.dp),\n    large = RoundedCornerShape(24.dp),\n)\nprivate val LightColors = lightColorScheme(
     primary = BeamBlue,
     onPrimary = Color.White,
     primaryContainer = Color(0xFFDCE9FF),
@@ -63,5 +66,5 @@ fun FileBeamTheme(
     content: @Composable () -> Unit,
 ) {
     val scheme = if (darkTheme) DarkColors else LightColors
-    MaterialTheme(colorScheme = scheme, content = content)
+    MaterialTheme(colorScheme = scheme, shapes = FileBeamShapes, content = content)
 }

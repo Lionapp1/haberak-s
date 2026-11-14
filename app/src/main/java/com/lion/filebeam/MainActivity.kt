@@ -37,6 +37,7 @@ import com.lion.filebeam.ui.SenderScreen
 import com.lion.filebeam.ui.ScreenMirrorScreen
 import com.lion.filebeam.ui.SettingsScreen
 import com.lion.filebeam.ui.HistoryScreen
+import com.lion.filebeam.ui.UpdateScreen
 import com.lion.filebeam.ui.theme.FileBeamTheme
 
 class MainActivity : ComponentActivity() {
@@ -58,8 +59,9 @@ class MainActivity : ComponentActivity() {
                     "send" -> SenderScreen(onBack = { mode = "home" })
                     "receive" -> ReceiverScreen(onBack = { mode = "home" })
                     "mirror" -> ScreenMirrorScreen(onBack = { mode = "home" })
-                    "settings" -> SettingsScreen(themeMode, mirrorProfile, { v -> themeMode = v; SettingsStore.setThemeMode(context, v) }, { v -> mirrorProfile = v; SettingsStore.setMirrorProfile(context, v) }, { mode = "home" })
+                    "settings" -> SettingsScreen(themeMode, mirrorProfile, { v -> themeMode = v; SettingsStore.setThemeMode(context, v) }, { v -> mirrorProfile = v; SettingsStore.setMirrorProfile(context, v) }, { mode = "updates" }, { mode = "home" })
                     "history" -> HistoryScreen(onBack = { mode = "home" })
+                    "updates" -> UpdateScreen(onBack = { mode = "settings" })
                     else -> HomeScreen(
                         onSend = { mode = "send" },
                         onReceive = { mode = "receive" },

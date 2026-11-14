@@ -136,43 +136,32 @@ fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit, 
                         modifier = Modifier.widthIn(max = if (isTv) 760.dp else 560.dp),
                     )
                     Spacer(Modifier.height(if (isTv) 42.dp else 30.dp))
-                    if (wide) {
+                    if (isTv) {
                         Row(
                             Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(if (isTv) 28.dp else 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(22.dp),
                         ) {
-                            ModeCard(
-                                "Gönder",
-                                "Bu cihazdan başka bir cihaza dosya yolla",
-                                Icons.Filled.Send,
-                                onSend,
-                                Modifier.weight(1f),
-                                isTv,
-                            )
-                            ModeCard(
-                                "Al",
-                                "Bu cihazı dosya almak için hazırla",
-                                Icons.Filled.Tv,
-                                onReceive,
-                                Modifier.weight(1f),
-                                isTv,
-                            )
+                            ModeCard("Gönder", "Telefonundan veya TV'nden dosya gönder", Icons.Filled.Send, onSend, Modifier.weight(1f).height(205.dp), true)
+                            ModeCard("Al", "Dosyaları bu cihaza kaydet", Icons.Filled.Tv, onReceive, Modifier.weight(1f).height(205.dp), true)
+                            ModeCard("Yansıt", "Telefon ekranını TV'de tam ekran göster", Icons.Filled.Cast, onMirror, Modifier.weight(1f).height(205.dp), true)
                         }
+                    } else if (wide) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            ModeCard("Gönder", "Bu cihazdan başka bir cihaza dosya yolla", Icons.Filled.Send, onSend, Modifier.weight(1f))
+                            ModeCard("Al", "Bu cihazı dosya almak için hazırla", Icons.Filled.Tv, onReceive, Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        ModeCard("Ekran yansıt", "Telefon ekranını aynı ağdaki Android TV'de göster", Icons.Filled.Cast, onMirror, Modifier.fillMaxWidth())
                     } else {
                         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             ModeCard("Gönder", "Bu cihazdan başka bir cihaza dosya yolla", Icons.Filled.Send, onSend)
                             ModeCard("Al", "Bu cihazı dosya almak için hazırla", Icons.Filled.Tv, onReceive)
+                            ModeCard("Ekran yansıt", "Telefon ekranını aynı ağdaki Android TV'de göster", Icons.Filled.Cast, onMirror)
                         }
                     }
-                    Spacer(Modifier.height(if (isTv) 14.dp else 12.dp))
-                    ModeCard(
-                        "Ekran yansıt",
-                        "Telefon ekranını aynı ağdaki Android TV'de göster",
-                        Icons.Filled.Cast,
-                        onMirror,
-                        Modifier.fillMaxWidth(),
-                        isTv,
-                    )
                     Spacer(Modifier.height(if (isTv) 28.dp else 22.dp))
                     Text(
                         "İnternet gerekmez  ·  Dosyaların buluta yüklenmez",
@@ -200,7 +189,7 @@ fun ModeCard(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (isTv) 250.dp else 104.dp)
+            .heightIn(min = if (isTv) 190.dp else 104.dp)
             .onFocusChanged { focused = it.isFocused }
             .border(
                 width = if (focused) 3.dp else 1.dp,
@@ -216,18 +205,18 @@ fun ModeCard(
     ) {
         if (isTv) {
             Column(
-                Modifier.fillMaxSize().padding(30.dp),
+                Modifier.fillMaxSize().padding(22.dp),
                 verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Surface(shape = RoundedCornerShape(15.dp), color = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(66.dp)) {
+                Surface(shape = RoundedCornerShape(15.dp), color = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(56.dp)) {
                     Box(contentAlignment = Alignment.Center) {
-                        Icon(icon, null, tint = if (focused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(32.dp))
+                        Icon(icon, null, tint = if (focused) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(28.dp))
                     }
                 }
                 Column {
-                    Text(title, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+                    Text(title, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
-                    Text(subtitle, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 25.sp)
+                    Text(subtitle, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 21.sp)
                 }
             }
         } else {

@@ -3,12 +3,15 @@
 package com.lion.filebeam.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,6 +26,7 @@ fun SettingsScreen(
     mirrorProfile: String,
     onThemeChange: (String) -> Unit,
     onMirrorProfileChange: (String) -> Unit,
+    onUpdates: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -39,7 +43,7 @@ fun SettingsScreen(
         }
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(horizontal = 18.dp, vertical = 16.dp),
+            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
             SettingsSection(
@@ -79,6 +83,17 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            SettingsSection(
+                icon = { Icon(Icons.Filled.SystemUpdate, null, tint = MaterialTheme.colorScheme.primary) },
+                title = "Uygulama güncellemesi",
+                description = "GitHub Releases sürümlerini kontrol et. Yeni APK'yi indir, doğrula ve Android kurulumunu başlat."
+            ) {
+                Button(onClick = onUpdates, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.SystemUpdate, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Güncellemeleri kontrol et")
+                }
             }
             SettingsSection(
                 icon = { Icon(Icons.Filled.Tune, null, tint = MaterialTheme.colorScheme.primary) },

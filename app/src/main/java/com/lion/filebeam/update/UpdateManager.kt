@@ -101,19 +101,53 @@ object UpdateManager {
         }
         withContext(Dispatchers.Main) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-                val permissionIntent = Intent(
-                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                    Uri.parse("package:${context.packageName}"),
-                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(permissionIntent)
-                throw InstallPermissionRequiredException()
+                val packageUri = Uri.parse("package:${context.packageName}")
+                val permissionIntents = listOf(
+                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, packageUri),
+                    // Android TV firmwares may not implement the dedicated unknown-sources screen.
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri),
+                    Intent(Settings.ACTION_SECURITY_SETTINGS),
+                    Intent(Settings.ACTION_SETTINGS),
+                )
+                var opened = false
+                for (permissionIntent in permissionIntents) {
+                    try {
+                        permissionIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(permissionIntent)
+                        opened = true
+                        break
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        // Try the next settings screen supported by this device.
+                    } catch (_: SecurityException) {
+                        // Some TV launchers restrict a settings destination; try a broader one.
+                    }
+                }
+                throw InstallPermissionRequiredException(
+                    if (opened) {
+                        "Bu TV'de özel izin sayfası bulunamadıysa Ayarlar > Uygulamalar > Özel uygulama erişimi > Bilinmeyen uygulamaları yükle bölümünden FileBeam'e izin ver, sonra tekrar İndir ve kur'a dokun."
+                    } else {
+                        "Bu cihaz izin ayarlarını uygulama içinden açamıyor. TV Ayarları > Uygulamalar > Özel uygulama erişimi bölümünden FileBeam için bilinmeyen uygulama yükleme iznini elle aç."
+                    }
+                )
             }
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
-            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+            val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            context.startActivity(installIntent)
+            try {
+                context.startActivity(installIntent)
+            } catch (_: android.content.ActivityNotFoundException) {
+                val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                try {
+                    context.startActivity(viewIntent)
+                } catch (_: android.content.ActivityNotFoundException) {
+                    throw IllegalStateException("Bu TV'de APK kurulumunu açacak sistem yükleyicisi bulunamadı. İndirilen APK dosyasını Dosya Yöneticisi'nden açarak kurmayı dene.")
+                }
+            }
         }
     }
 
@@ -189,4 +223,4 @@ object UpdateManager {
     }
 }
 
-class InstallPermissionRequiredException : Exception("Android'de FileBeam için bilinmeyen uygulama yükleme iznini açıp tekrar Güncellemeyi Kur'a dokun.")
+class InstallPermissionRequiredException(message: String) : Exception(message)

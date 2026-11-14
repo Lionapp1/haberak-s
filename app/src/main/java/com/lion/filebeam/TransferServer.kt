@@ -134,6 +134,7 @@ class TransferServer(
             }
             output = null
             FileSaver.finish(context, uri)
+            TransferHistory.record(context, name, uri, received)
             savedUri = null
             response.write("DONE\n".toByteArray(Charsets.US_ASCII))
             response.flush()

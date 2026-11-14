@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lion.filebeam.ui.ReceiverScreen
 import com.lion.filebeam.ui.SenderScreen
+import com.lion.filebeam.ui.ScreenMirrorScreen
 import com.lion.filebeam.ui.theme.FileBeamTheme
 
 class MainActivity : ComponentActivity() {
@@ -41,9 +43,11 @@ class MainActivity : ComponentActivity() {
                 when (mode) {
                     "send" -> SenderScreen(onBack = { mode = "home" })
                     "receive" -> ReceiverScreen(onBack = { mode = "home" })
+                    "mirror" -> ScreenMirrorScreen(onBack = { mode = "home" })
                     else -> HomeScreen(
                         onSend = { mode = "send" },
                         onReceive = { mode = "receive" },
+                        onMirror = { mode = "mirror" },
                     )
                 }
             }
@@ -52,7 +56,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit) {
+fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit) {
     val context = LocalContext.current
     val isTv = remember {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
@@ -151,6 +155,15 @@ fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit) {
                             ModeCard("Al", "Bu cihazı dosya almak için hazırla", Icons.Filled.Tv, onReceive)
                         }
                     }
+                    Spacer(Modifier.height(if (isTv) 14.dp else 12.dp))
+                    ModeCard(
+                        "Ekran yansıt",
+                        "Telefon ekranını aynı ağdaki Android TV'de göster",
+                        Icons.Filled.Cast,
+                        onMirror,
+                        Modifier.fillMaxWidth(),
+                        isTv,
+                    )
                     Spacer(Modifier.height(if (isTv) 28.dp else 22.dp))
                     Text(
                         "İnternet gerekmez  ·  Dosyaların buluta yüklenmez",

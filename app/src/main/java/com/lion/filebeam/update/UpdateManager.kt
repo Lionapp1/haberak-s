@@ -1,9 +1,12 @@
 package com.lion.filebeam.update
 
 import android.content.Context
+import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
@@ -99,6 +102,7 @@ object UpdateManager {
                 throw IllegalStateException("İndirilen dosyanın SHA-256 doğrulaması başarısız.")
             }
         }
+        val downloadsUri = saveVerifiedApkToDownloads(context, apkFile, release.version)
         withContext(Dispatchers.Main) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
                 val packageUri = Uri.parse("package:${context.packageName}")
@@ -130,7 +134,7 @@ object UpdateManager {
                     }
                 )
             }
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
+            val uri = downloadsUri ?: FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", apkFile)
             val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -145,9 +149,76 @@ object UpdateManager {
                 try {
                     context.startActivity(viewIntent)
                 } catch (_: android.content.ActivityNotFoundException) {
-                    throw IllegalStateException("Bu TV'de APK kurulumunu açacak sistem yükleyicisi bulunamadı. İndirilen APK dosyasını Dosya Yöneticisi'nden açarak kurmayı dene.")
+                    throw IllegalStateException("Bu TV'de uygulama içi APK yükleyicisi bulunamadı. Doğrulanmış APK İndirilenler/FileBeam klasörüne kaydedildi. TV'nin Dosya Yöneticisi'nden FileBeam-${release.version}.apk dosyasını açarak kurmayı dene.")
                 }
             }
+        }
+    }
+
+
+    private fun saveVerifiedApkToDownloads(context: Context, source: File, version: String): Uri? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+        val resolver = context.contentResolver
+        val name = "FileBeam-$version.apk"
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        resolver.query(
+            collection,
+            arrayOf(MediaStore.Downloads._ID),
+            "${MediaStore.Downloads.DISPLAY_NAME} = ?",
+            arrayOf(name),
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val oldUri = Uri.withAppendedPath(collection, cursor.getLong(0).toString())
+                runCatching { resolver.delete(oldUri, null, null) }
+            }
+        }
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, name)
+            put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/FileBeam")
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(collection, values) ?: return null
+        return try {
+            resolver.openOutputStream(uri)?.use { output ->
+                source.inputStream().buffered().use { input -> input.copyTo(output) }
+            } ?: throw IllegalStateException("APK İndirilenler klasörüne kaydedilemedi.")
+            resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+            uri
+        } catch (error: Exception) {
+            resolver.delete(uri, null, null)
+            throw error
+        }
+    }
+
+    fun installDownloadedApk(context: Context, version: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+            throw InstallPermissionRequiredException("Önce TV Ayarları'ndan FileBeam için bilinmeyen uygulama yükleme iznini aç.")
+        }
+        val name = "FileBeam-$version.apk"
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        val uri = context.contentResolver.query(
+            collection,
+            arrayOf(MediaStore.Downloads._ID),
+            "${MediaStore.Downloads.DISPLAY_NAME} = ?",
+            arrayOf(name),
+            "${MediaStore.Downloads._ID} DESC",
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) Uri.withAppendedPath(collection, cursor.getLong(0).toString()) else null
+        } ?: throw IllegalStateException("Kaydedilmiş APK bulunamadı. Önce güncellemeyi indir.")
+        val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(intent)
+        } catch (_: android.content.ActivityNotFoundException) {
+            val view = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(view)
         }
     }
 

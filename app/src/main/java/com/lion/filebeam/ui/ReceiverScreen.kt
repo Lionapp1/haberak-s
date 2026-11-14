@@ -35,12 +35,13 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.lion.filebeam.Discovery
 import com.lion.filebeam.TransferClient
 import com.lion.filebeam.TransferServer
+import com.lion.filebeam.SettingsStore
 
 @Composable
 fun ReceiverScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val isTv = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) }
-    val pin = remember { (100000..999999).random().toString() }
+    val pin = remember { SettingsStore.transferPin(context) }
     val ip = remember { Discovery.localIp() }
     var port by remember { mutableIntStateOf(0) }
     var error by remember { mutableStateOf<String?>(null) }

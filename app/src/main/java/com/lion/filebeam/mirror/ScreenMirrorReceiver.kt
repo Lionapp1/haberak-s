@@ -1,5 +1,8 @@
 package com.lion.filebeam.mirror
 
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.view.Surface
@@ -19,6 +22,7 @@ class ScreenMirrorReceiver(
     @Volatile private var server: ServerSocket? = null
     @Volatile private var client: Socket? = null
     @Volatile private var decoder: MediaCodec? = null
+    @Volatile private var audioTrack: AudioTrack? = null
 
     fun start() {
         if (!surface.isValid || !running.compareAndSet(false, true)) return
@@ -79,31 +83,70 @@ class ScreenMirrorReceiver(
 
         val info = MediaCodec.BufferInfo()
         while (running.get() && !socket.isClosed) {
-            val size = try { input.readInt() } catch (_: java.io.EOFException) { break }
-            if (size < 0) break
-            require(size in 1..2_000_000) { "Video paketi boyutu geçersiz" }
-            val flags = input.readInt()
-            val pts = input.readLong()
-            val bytes = ByteArray(size)
-            input.readFully(bytes)
-            var inputIndex = codec.dequeueInputBuffer(10_000)
-            while (inputIndex < 0 && running.get()) inputIndex = codec.dequeueInputBuffer(10_000)
-            if (inputIndex >= 0) {
-                val target = codec.getInputBuffer(inputIndex) ?: error("TV video tamponu açılamadı")
-                target.clear()
-                require(bytes.size <= target.remaining()) { "Video karesi çözücü tamponundan büyük" }
-                target.put(bytes)
-                codec.queueInputBuffer(inputIndex, 0, bytes.size, pts, flags)
-            }
-            var outputIndex = codec.dequeueOutputBuffer(info, 0)
-            while (outputIndex >= 0) {
-                codec.releaseOutputBuffer(outputIndex, true)
-                outputIndex = codec.dequeueOutputBuffer(info, 0)
+            when (input.readInt()) {
+                PACKET_AUDIO_CONFIG -> {
+                    val rate = input.readInt()
+                    val channels = input.readInt()
+                    val encoding = input.readInt()
+                    val channelOut = if (channels == 1) AudioFormat.CHANNEL_OUT_MONO else AudioFormat.CHANNEL_OUT_STEREO
+                    val min = AudioTrack.getMinBufferSize(rate, channelOut, encoding)
+                    if (min > 0) {
+                        releaseAudio()
+                        val track = AudioTrack.Builder()
+                            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
+                            .setAudioFormat(AudioFormat.Builder().setSampleRate(rate).setChannelMask(channelOut)
+                                .setEncoding(encoding).build())
+                            .setBufferSizeInBytes(maxOf(min * 2, 16384))
+                            .setTransferMode(AudioTrack.MODE_STREAM).build()
+                        if (track.state == AudioTrack.STATE_INITIALIZED) {
+                            audioTrack = track
+                            track.play()
+                        } else track.release()
+                    }
+                }
+                PACKET_AUDIO -> {
+                    val size = input.readInt()
+                    require(size in 1..262144) { "Ses paketi boyutu geçersiz" }
+                    val pcm = ByteArray(size)
+                    input.readFully(pcm)
+                    audioTrack?.write(pcm, 0, pcm.size, AudioTrack.WRITE_BLOCKING)
+                }
+                PACKET_VIDEO -> {
+                    val size = input.readInt()
+                    require(size in 1..2_000_000) { "Video paketi boyutu geçersiz" }
+                    val flags = input.readInt()
+                    val pts = input.readLong()
+                    val bytes = ByteArray(size)
+                    input.readFully(bytes)
+                    var inputIndex = codec.dequeueInputBuffer(10_000)
+                    while (inputIndex < 0 && running.get()) inputIndex = codec.dequeueInputBuffer(10_000)
+                    if (inputIndex >= 0) {
+                        val target = codec.getInputBuffer(inputIndex) ?: error("TV video tamponu açılamadı")
+                        target.clear()
+                        require(bytes.size <= target.remaining()) { "Video karesi çözücü tamponundan büyük" }
+                        target.put(bytes)
+                        codec.queueInputBuffer(inputIndex, 0, bytes.size, pts, flags)
+                    }
+                    var outputIndex = codec.dequeueOutputBuffer(info, 0)
+                    while (outputIndex >= 0) {
+                        codec.releaseOutputBuffer(outputIndex, true)
+                        outputIndex = codec.dequeueOutputBuffer(info, 0)
+                    }
+                }
+                else -> throw IllegalStateException("Bilinmeyen aktarım paketi")
             }
         }
     }
 
+    private fun releaseAudio() {
+        val track = audioTrack
+        audioTrack = null
+        if (track != null) { runCatching { track.pause() }; runCatching { track.flush() }; runCatching { track.stop() }; runCatching { track.release() } }
+    }
+
     private fun releaseDecoder() {
+        releaseAudio()
         val current = decoder
         decoder = null
         if (current != null) {
@@ -119,5 +162,5 @@ class ScreenMirrorReceiver(
         releaseDecoder()
     }
 
-    companion object { private const val MAGIC = 0x46424D31 }
+    companion object { private const val MAGIC = 0x46424D32; private const val PACKET_VIDEO = 1; private const val PACKET_AUDIO_CONFIG = 2; private const val PACKET_AUDIO = 3 }
 }

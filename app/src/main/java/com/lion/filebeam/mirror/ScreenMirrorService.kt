@@ -146,8 +146,8 @@ class ScreenMirrorService : Service() {
         }
         val activeCodec = codec ?: throw IllegalStateException("Bu cihazda yansıtma kodlayıcısı başlatılamadı", lastConfigureError)
         encoder = activeCodec
-        val format = selectedFormat ?: error("Video profili seçilemedi")
-        val inputSurface = codec.createInputSurface()
+        selectedFormat ?: error("Video profili seçilemedi")
+        val inputSurface = activeCodec.createInputSurface()
         activeCodec.start()
         virtualDisplay = projection?.createVirtualDisplay(
             "FileBeam Screen Mirror", width, height, metrics.densityDpi,

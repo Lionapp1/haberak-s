@@ -69,7 +69,7 @@ fun SenderScreen(onBack: () -> Unit) {
         val savedPin = SettingsStore.savedTransferPin(context)
         mutableStateOf(
             if (savedIp.isNotBlank() && savedPin.length == 6) {
-                Discovery.Beacon("Kayıtlı cihaz", savedIp, Discovery.TCP_PORT, savedPin)
+                Discovery.Beacon("Kayıtlı cihaz", savedIp, Discovery.TCP_PORT, savedPin, seen = 0L)
             } else null
         )
     }
@@ -222,6 +222,7 @@ fun SenderScreen(onBack: () -> Unit) {
     }
 
     fun startSend() {
+        autoSendPending = false
         val dev = selected ?: return
         if (picked.isEmpty()) return
         sending = true
@@ -243,7 +244,8 @@ fun SenderScreen(onBack: () -> Unit) {
     }
 
     LaunchedEffect(autoSendPending, picked, selected, sending) {
-        if (autoSendPending && picked.isNotEmpty() && selected?.pin?.length == 6 && !sending) {
+        if (autoSendPending && picked.isNotEmpty() && selected?.pin?.length == 6 &&
+            selected?.seen?.let { it >= System.currentTimeMillis() - 9000 } == true && !sending) {
             autoSendPending = false
             startSend()
         }

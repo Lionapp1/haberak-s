@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.lion.filebeam.ui.ReceiverScreen
 import com.lion.filebeam.ui.SenderScreen
 import com.lion.filebeam.ui.ScreenMirrorScreen
+import com.lion.filebeam.ui.SettingsScreen
 import com.lion.filebeam.ui.theme.FileBeamTheme
 
 class MainActivity : ComponentActivity() {
@@ -38,16 +40,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            FileBeamTheme {
+            val context = LocalContext.current
+            var themeMode by remember { mutableStateOf(SettingsStore.themeMode(context)) }
+            var mirrorProfile by remember { mutableStateOf(SettingsStore.mirrorProfile(context)) }
+            val darkTheme = when (themeMode) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }
+            FileBeamTheme(darkTheme = darkTheme) {
                 var mode by remember { mutableStateOf("home") }
                 when (mode) {
                     "send" -> SenderScreen(onBack = { mode = "home" })
                     "receive" -> ReceiverScreen(onBack = { mode = "home" })
                     "mirror" -> ScreenMirrorScreen(onBack = { mode = "home" })
+                    "settings" -> SettingsScreen(themeMode, mirrorProfile, { v -> themeMode = v; SettingsStore.setThemeMode(context, v) }, { v -> mirrorProfile = v; SettingsStore.setMirrorProfile(context, v) }, { mode = "home" })
                     else -> HomeScreen(
                         onSend = { mode = "send" },
                         onReceive = { mode = "receive" },
                         onMirror = { mode = "mirror" },
+                        onSettings = { mode = "settings" },
                     )
                 }
             }
@@ -56,7 +64,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit) {
+fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit, onSettings: () -> Unit) {
     val context = LocalContext.current
     val isTv = remember {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
@@ -82,6 +90,7 @@ fun HomeScreen(onSend: () -> Unit, onReceive: () -> Unit, onMirror: () -> Unit) 
                         }
                     }
                 },
+                actions = { IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, contentDescription = "Ayarlar") } },
             )
         },
     ) { padding ->

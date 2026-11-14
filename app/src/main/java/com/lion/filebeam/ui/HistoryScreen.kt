@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,7 +29,7 @@ import java.util.Date
 @Composable
 fun HistoryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val entries = remember { TransferHistory.list(context) }
+    val entries = remember { mutableStateListOf<TransferHistoryEntry>().apply { addAll(TransferHistory.list(context)) } }
     BackHandler(onBack = onBack)
     Scaffold(
         topBar = {
@@ -63,7 +64,7 @@ fun HistoryScreen(onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(entries, key = { it.timestamp.toString() + it.uri }) { entry ->
-                    HistoryRow(entry)
+                    HistoryRow(entry, onDelete = { TransferHistory.delete(context, entry); entries.remove(entry) })
                 }
             }
         }
@@ -71,7 +72,7 @@ fun HistoryScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun HistoryRow(entry: TransferHistoryEntry) {
+private fun HistoryRow(entry: TransferHistoryEntry, onDelete: () -> Unit) {
     val context = LocalContext.current
     val date = remember(entry.timestamp) { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(entry.timestamp)) }
     Surface(
@@ -92,7 +93,7 @@ private fun HistoryRow(entry: TransferHistoryEntry) {
                 Text(entry.name, fontWeight = FontWeight.SemiBold, maxLines = 2)
                 Text("$date · ${formatSize(entry.size)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Icon(Icons.Filled.FolderOpen, contentDescription = "Dosyayı aç", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, contentDescription = "Dosyayı ve kaydı sil", tint = MaterialTheme.colorScheme.error) }
         }
     }
 }

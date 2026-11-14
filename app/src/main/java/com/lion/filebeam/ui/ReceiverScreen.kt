@@ -78,161 +78,265 @@ fun ReceiverScreen(onBack: () -> Unit) {
         Discovery.broadcastLoop(port)
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Dosya al", fontWeight = FontWeight.Bold)
-                        Text("Bu cihazı aktarım için hazırla", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") } },
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(
-                horizontal = if (isTv) 40.dp else 16.dp,
-                vertical = 14.dp,
-            ),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            item {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(Icons.Filled.Wifi, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                            Spacer(Modifier.width(6.dp))
-                            Text("BAĞLANTI BEKLENİYOR", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer, fontWeight = FontWeight.Bold)
+    if (isTv) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("FileBeam · Dosya al", fontWeight = FontWeight.Bold)
+                            Text("TV'n dosya almaya hazır", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    Text("Cihazın hazır", fontSize = if (isTv) 32.sp else 24.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Telefonundan QR kodu okut veya aşağıdaki PIN'i kullan.",
-                        fontSize = if (isTv) 18.sp else 13.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-            item {
+                    },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") } },
+                )
+            },
+        ) { padding ->
+            Row(
+                Modifier.fillMaxSize().padding(padding).padding(horizontal = 36.dp, vertical = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    shape = RoundedCornerShape(26.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 ) {
                     Column(
-                        Modifier.fillMaxWidth().padding(if (isTv) 24.dp else 16.dp),
+                        Modifier.fillMaxSize().padding(22.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                     ) {
+                        Text("TELEFONUNDAN BAĞLAN", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(16.dp))
                         if (ip.isNotBlank() && port > 0) {
                             QrImage(
                                 content = "filebeam://" + ip + ":" + port + "#" + pin,
-                                modifier = Modifier
-                                    .size(if (isTv) 310.dp else 190.dp)
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color.White)
-                                    .padding(7.dp),
+                                modifier = Modifier.size(260.dp).clip(RoundedCornerShape(16.dp)).background(Color.White).padding(8.dp),
                             )
                         } else {
-                            Box(Modifier.size(if (isTv) 310.dp else 190.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
-                            }
+                            Box(Modifier.size(260.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Text("Bağlanmak için QR kodu okut", fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 19.sp else 14.sp)
-                        Text(ip + ":" + port, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(14.dp))
+                        Text("QR kodu okut", fontWeight = FontWeight.Bold, fontSize = 21.sp)
+                        Text(ip + ":" + port, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            }
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                Column(
+                    Modifier.weight(1f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(if (isTv) 24.dp else 18.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Text("6 HANELİ GÜVENLİ PIN", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(4.dp))
-                        Text(pin, fontSize = if (isTv) 58.sp else 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = if (isTv) 10.sp else 7.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        Text("Telefonunda manuel bağlantı için kullan", fontSize = if (isTv) 16.sp else 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                    Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+                        Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("GÜVENLİ BAĞLANTI PIN'İ", color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
+                            Text(pin, fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 8.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text("İlk eşleştirmede kullan; sonraki gönderimler otomatik bağlanır.", color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f), textAlign = TextAlign.Center)
+                        }
                     }
-                }
-            }
-            if (incoming != null) {
-                item {
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
-                        Column(Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.Download, null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Dosya alınıyor", fontWeight = FontWeight.Bold)
+                    if (incoming != null) {
+                        Card(shape = RoundedCornerShape(20.dp)) {
+                            Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                                Text("Dosya alınıyor", fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                                Text(incoming!!.fileName, maxLines = 1)
+                                LinearProgressIndicator(
+                                    progress = { if (incoming!!.total > 0) (incoming!!.bytes.toFloat() / incoming!!.total).coerceIn(0f, 1f) else 0f },
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                                )
+                                Text(formatSize(incoming!!.bytes) + " / " + (if (incoming!!.total >= 0) formatSize(incoming!!.total) else "Bilinmiyor") + " · " + formatSpeed(incoming!!.speedBps))
                             }
-                            Spacer(Modifier.height(8.dp))
-                            Text(incoming!!.fileName, maxLines = 2, fontSize = 14.sp)
-                            LinearProgressIndicator(
-                                progress = { if (incoming!!.total > 0) (incoming!!.bytes.toFloat() / incoming!!.total).coerceIn(0f, 1f) else 0f },
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp),
-                            )
-                            Text(
-                                formatSize(incoming!!.bytes) + " / " + (if (incoming!!.total >= 0) formatSize(incoming!!.total) else "Bilinmiyor") + " · " + formatSpeed(incoming!!.speedBps),
-                                style = MaterialTheme.typography.bodySmall,
-                            )
+                        }
+                    } else {
+                        Card(shape = RoundedCornerShape(20.dp)) {
+                            Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.Wifi, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text("Bağlantı bekleniyor", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                    Text("Telefon ve TV aynı Wi-Fi ağında olsun.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                    if (error != null) {
+                        Text("⚠  " + error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Card(modifier = Modifier.weight(1f).fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                        Column(Modifier.fillMaxSize().padding(18.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Filled.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Son aktarımlar", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            if (log.isEmpty()) {
+                                Text("Gönderdiğin dosyalar burada görünecek.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else {
+                                log.take(5).forEach { line ->
+                                    Text(line, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), maxLines = 1)
+                                }
+                            }
                         }
                     }
                 }
             }
-            if (error != null) {
-                item {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
-                    ) {
-                        Text("⚠  " + error, modifier = Modifier.padding(14.dp), color = MaterialTheme.colorScheme.onErrorContainer)
-                    }
-                }
-            }
-            if (log.isNotEmpty()) {
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Son aktarımlar", fontWeight = FontWeight.Bold, fontSize = if (isTv) 20.sp else 16.sp)
-                    }
-                }
-                items(log) { line ->
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    ) {
-                        Text(line, modifier = Modifier.padding(13.dp), fontSize = if (isTv) 17.sp else 13.sp)
-                    }
-                }
-            }
-            item {
-                Text(
-                    "Dosyalar doğrudan yerel ağ üzerinden aktarılır; buluta yüklenmez.",
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = if (isTv) 15.sp else 11.sp,
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
+        }
+    } else {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("Dosya al", fontWeight = FontWeight.Bold)
+                            Text("Bu cihazı aktarım için hazırla", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Geri") } },
                 )
+            }
+        ) { padding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(
+                    horizontal = if (isTv) 40.dp else 16.dp,
+                    vertical = 14.dp,
+                ),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                item {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                        ) {
+                            Row(
+                                Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Filled.Wifi, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                                Spacer(Modifier.width(6.dp))
+                                Text("BAĞLANTI BEKLENİYOR", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text("Cihazın hazır", fontSize = if (isTv) 32.sp else 24.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Telefonundan QR kodu okut veya aşağıdaki PIN'i kullan.",
+                            fontSize = if (isTv) 18.sp else 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    ) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(if (isTv) 24.dp else 16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            if (ip.isNotBlank() && port > 0) {
+                                QrImage(
+                                    content = "filebeam://" + ip + ":" + port + "#" + pin,
+                                    modifier = Modifier
+                                        .size(if (isTv) 310.dp else 190.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color.White)
+                                        .padding(7.dp),
+                                )
+                            } else {
+                                Box(Modifier.size(if (isTv) 310.dp else 190.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator()
+                                }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Text("Bağlanmak için QR kodu okut", fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 19.sp else 14.sp)
+                            Text(ip + ":" + port, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    ) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(if (isTv) 24.dp else 18.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text("6 HANELİ GÜVENLİ PIN", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            Text(pin, fontSize = if (isTv) 58.sp else 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = if (isTv) 10.sp else 7.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text("Telefonunda manuel bağlantı için kullan", fontSize = if (isTv) 16.sp else 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
+                        }
+                    }
+                }
+                if (incoming != null) {
+                    item {
+                        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                            Column(Modifier.padding(16.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Filled.Download, null, tint = MaterialTheme.colorScheme.primary)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Dosya alınıyor", fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                Text(incoming!!.fileName, maxLines = 2, fontSize = 14.sp)
+                                LinearProgressIndicator(
+                                    progress = { if (incoming!!.total > 0) (incoming!!.bytes.toFloat() / incoming!!.total).coerceIn(0f, 1f) else 0f },
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 9.dp),
+                                )
+                                Text(
+                                    formatSize(incoming!!.bytes) + " / " + (if (incoming!!.total >= 0) formatSize(incoming!!.total) else "Bilinmiyor") + " · " + formatSpeed(incoming!!.speedBps),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    }
+                }
+                if (error != null) {
+                    item {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                        ) {
+                            Text("⚠  " + error, modifier = Modifier.padding(14.dp), color = MaterialTheme.colorScheme.onErrorContainer)
+                        }
+                    }
+                }
+                if (log.isNotEmpty()) {
+                    item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Son aktarımlar", fontWeight = FontWeight.Bold, fontSize = if (isTv) 20.sp else 16.sp)
+                        }
+                    }
+                    items(log) { line ->
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        ) {
+                            Text(line, modifier = Modifier.padding(13.dp), fontSize = if (isTv) 17.sp else 13.sp)
+                        }
+                    }
+                }
+                item {
+                    Text(
+                        "Dosyalar doğrudan yerel ağ üzerinden aktarılır; buluta yüklenmez.",
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = if (isTv) 15.sp else 11.sp,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
+                    )
+                }
             }
         }
     }

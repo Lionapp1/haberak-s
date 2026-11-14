@@ -143,7 +143,7 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
                                 receiver?.stop()
                                 receiver = ScreenMirrorReceiver(holder.surface, tvPin) { message ->
                                     status = message
-                                    active = message.startsWith("Yansıtma başladı")
+                                    active = message.startsWith("Görüntü alınıyor") || message.startsWith("Yansıtma başladı")
                                 }.also { it.start() }
                             }
                             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit

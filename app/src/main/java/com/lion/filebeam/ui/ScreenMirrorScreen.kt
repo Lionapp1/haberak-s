@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.lion.filebeam.Discovery
+import com.lion.filebeam.SettingsStore
 import com.lion.filebeam.mirror.ScreenMirrorReceiver
 import com.lion.filebeam.mirror.ScreenMirrorService
 
@@ -49,6 +50,7 @@ fun ScreenMirrorScreen(onBack: () -> Unit) {
                 putExtra(ScreenMirrorService.EXTRA_DATA, result.data)
                 putExtra(ScreenMirrorService.EXTRA_HOST, host.trim())
                 putExtra(ScreenMirrorService.EXTRA_PIN, pinInput)
+                putExtra(ScreenMirrorService.EXTRA_PROFILE, SettingsStore.mirrorProfile(context))
             }
             ContextCompat.startForegroundService(context, service)
             status = "Ekran aktarımı başlatılıyor…"

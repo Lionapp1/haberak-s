@@ -1,11 +1,13 @@
 package com.lion.filebeam.ui
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.focusable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lion.filebeam.TransferHistory
@@ -150,7 +153,22 @@ private fun HistoryRow(
     val isApk = entry.name.endsWith(".apk", ignoreCase = true)
 
     fun openFile() {
-        val uri = Uri.parse(entry.uri)
+        val storedUri = Uri.parse(entry.uri)
+        // Convert legacy file:// URIs into grantable content:// URIs for Android's installer.
+        val uri = if (storedUri.scheme == "file") {
+            val file = storedUri.path?.let { java.io.File(it) }
+            if (file != null && file.exists()) {
+                try {
+                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                } catch (error: Exception) {
+                    onMessage("APK dosyasına güvenli erişim sağlanamadı: ${error.message ?: "dosya yolu hatalı"}")
+                    return
+                }
+            } else {
+                onMessage("APK dosyası artık bu konumda bulunamıyor.")
+                return
+            }
+        } else storedUri
         if (isApk) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
                 val settingsUri = Uri.parse("package:${context.packageName}")
@@ -173,27 +191,33 @@ private fun HistoryRow(
                 onMessage("Önce Ayarlar'dan FileBeam için bilinmeyen uygulama yükleme iznini aç, sonra APK'ya tekrar dokun.")
                 return
             }
-            val installIntent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-                setDataAndType(uri, "application/vnd.android.package-archive")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            try {
-                context.startActivity(installIntent)
-            } catch (_: ActivityNotFoundException) {
-                val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+            val installerActions = listOf(Intent.ACTION_VIEW, Intent.ACTION_INSTALL_PACKAGE)
+            var launched = false
+            var lastError: Exception? = null
+            for (action in installerActions) {
+                if (launched) break
                 try {
-                    context.startActivity(viewIntent)
-                } catch (_: ActivityNotFoundException) {
-                    onMessage("Bu cihazda APK kurulum ekranı bulunamadı. Dosya yöneticisinden APK'yı açmayı dene.")
+                    val installIntent = Intent(action).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        clipData = ClipData.newUri(context.contentResolver, entry.name, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(installIntent)
+                    launched = true
+                } catch (error: ActivityNotFoundException) {
+                    lastError = error
+                } catch (error: SecurityException) {
+                    lastError = error
                 }
+            }
+            if (!launched) {
+                onMessage("TV'de APK yükleyicisi açılamadı. Dosya mevcut; TV'nin Dosya Yöneticisi'nden APK'yı açmayı dene. ${lastError?.message.orEmpty()}")
             }
         } else {
             val mime = context.contentResolver.getType(uri) ?: "*/*"
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, mime)
+                clipData = ClipData.newUri(context.contentResolver, entry.name, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             try { context.startActivity(intent) }
@@ -203,7 +227,7 @@ private fun HistoryRow(
 
     Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().clickable { openFile() }.focusable().padding(horizontal = 10.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Checkbox(checked = checked, onCheckedChange = onChecked)

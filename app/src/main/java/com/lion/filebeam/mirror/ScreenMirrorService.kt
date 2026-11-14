@@ -14,6 +14,7 @@ import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.IBinder
+import android.content.pm.ServiceInfo
 import android.util.DisplayMetrics
 import android.view.WindowManager
 import java.io.BufferedOutputStream
@@ -26,6 +27,7 @@ class ScreenMirrorService : Service() {
     private var projection: MediaProjection? = null
     private var virtualDisplay: VirtualDisplay? = null
     private var encoder: MediaCodec? = null
+    private var projectionCallback: MediaProjection.Callback? = null
     @Volatile private var running = false
     private var socket: Socket? = null
 
@@ -46,7 +48,11 @@ class ScreenMirrorService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        startForeground(NOTIFICATION_ID, notification())
+        if (Build.VERSION.SDK_INT >= 29) {
+            startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+        } else {
+            startForeground(NOTIFICATION_ID, notification())
+        }
         thread(name = "FileBeam-mirror-encoder") {
             try {
                 startMirror(resultCode, data, host, pin)
@@ -61,6 +67,10 @@ class ScreenMirrorService : Service() {
     private fun startMirror(resultCode: Int, data: Intent, host: String, pin: String) {
         val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         projection = manager.getMediaProjection(resultCode, data)
+        projectionCallback = object : MediaProjection.Callback() {
+            override fun onStop() { stopMirror(); stopSelf() }
+        }
+        projection?.registerCallback(projectionCallback!!, android.os.Handler(mainLooper))
         val metrics = DisplayMetrics()
         @Suppress("DEPRECATION")
         (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
@@ -70,7 +80,7 @@ class ScreenMirrorService : Service() {
 
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, 3_500_000)
+            setInteger(MediaFormat.KEY_BIT_RATE, 2_800_000)
             setInteger(MediaFormat.KEY_FRAME_RATE, 30)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
             if (Build.VERSION.SDK_INT >= 29) setInteger(MediaFormat.KEY_LATENCY, 1)
@@ -146,6 +156,8 @@ class ScreenMirrorService : Service() {
         runCatching { encoder?.release() }
         encoder = null
         runCatching { projection?.stop() }
+        projectionCallback?.let { callback -> runCatching { projection?.unregisterCallback(callback) } }
+        projectionCallback = null
         projection = null
         stopForeground(STOP_FOREGROUND_REMOVE)
     }

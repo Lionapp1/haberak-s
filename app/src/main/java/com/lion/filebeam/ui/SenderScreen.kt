@@ -2,12 +2,17 @@
 
 package com.lion.filebeam.ui
 
+import android.content.ContentValues
 import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.ActivityNotFoundException
 import android.widget.Toast
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -36,9 +41,11 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.lion.filebeam.Discovery
 import com.lion.filebeam.TransferClient
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SenderScreen(onBack: () -> Unit) {
@@ -50,6 +57,8 @@ fun SenderScreen(onBack: () -> Unit) {
     var picked by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var progress by remember { mutableStateOf<TransferClient.Progress?>(null) }
     var sending by remember { mutableStateOf(false) }
+    var externalBusy by remember { mutableStateOf(false) }
+    var externalMessage by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var doneMsg by remember { mutableStateOf<String?>(null) }
     var manualIp by remember { mutableStateOf("") }
@@ -86,6 +95,70 @@ fun SenderScreen(onBack: () -> Unit) {
             } ?: run { error = "QR anlaşılamadı" }
         }
     }
+    fun prepareForSfttv() {
+        if (picked.isEmpty() || externalBusy || sending) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            externalMessage = "SFTTV aktarım hazırlığı Android 10 ve üzeri cihazlarda destekleniyor. Diğer uygulamalarla paylaş seçeneğini kullanabilirsin."
+            return
+        }
+        externalBusy = true
+        externalMessage = null
+        scope.launch {
+            try {
+                val savedNames = withContext(Dispatchers.IO) {
+                    picked.mapIndexed { index, uri ->
+                        val originalName = context.contentResolver.query(
+                            uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null
+                        )?.use { cursor ->
+                            if (cursor.moveToFirst()) cursor.getString(0) else null
+                        } ?: "dosya_${index + 1}"
+                        val safeName = originalName.substringAfterLast('/').substringAfterLast('\\')
+                            .replace(Regex("[\\\\/:*?\\"<>|]"), "_")
+                        val values = ContentValues().apply {
+                            put(MediaStore.MediaColumns.DISPLAY_NAME, "${System.currentTimeMillis()}_${safeName}")
+                            put(MediaStore.MediaColumns.MIME_TYPE, context.contentResolver.getType(uri) ?: "application/octet-stream")
+                            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/FileBeam")
+                            put(MediaStore.MediaColumns.IS_PENDING, 1)
+                        }
+                        val target = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                            ?: error("Dosya İndirilenler/FileBeam klasörüne oluşturulamadı.")
+                        try {
+                            val input = context.contentResolver.openInputStream(uri)
+                                ?: error("Seçilen dosya okunamadı: $originalName")
+                            val output = context.contentResolver.openOutputStream(target, "w")
+                                ?: error("Hedef dosya yazılamadı: $originalName")
+                            input.use { source -> output.use { destination -> source.copyTo(destination, 128 * 1024) } }
+                            context.contentResolver.update(target, ContentValues().apply {
+                                put(MediaStore.MediaColumns.IS_PENDING, 0)
+                            }, null, null)
+                            originalName
+                        } catch (e: Exception) {
+                            context.contentResolver.delete(target, null, null)
+                            throw e
+                        }
+                    }
+                }
+                val launchIntent = context.packageManager.getLaunchIntentForPackage("com.yablio.sendfilestotv")
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(launchIntent)
+                    externalMessage = "${savedNames.size} dosya İndirilenler/FileBeam klasörüne hazırlandı. SFTTV'de GÖNDER bölümünü açıp bu klasörden dosyaları seç; TV'de ise AL ekranı açık olsun."
+                } else {
+                    externalMessage = "Dosyalar İndirilenler/FileBeam klasörüne hazırlandı. Send Files to TV telefonda kurulu değil; önce Yablio'nun resmî uygulamasını yükle."
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.yablio.sendfilestotv")))
+                    } catch (_: Exception) {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.yablio.sendfilestotv")))
+                    }
+                }
+            } catch (e: Exception) {
+                externalMessage = "SFTTV hazırlığı başarısız: ${e.message ?: "Dosyalar kopyalanamadı"}"
+            } finally {
+                externalBusy = false
+            }
+        }
+    }
+
     fun shareWithOtherApps() {
         if (picked.isEmpty()) return
         try {
@@ -277,19 +350,33 @@ fun SenderScreen(onBack: () -> Unit) {
                     }
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(
-                        onClick = { shareWithOtherApps() },
-                        enabled = picked.isNotEmpty() && !sending,
-                        modifier = Modifier.fillMaxWidth().height(if (isTv) 58.dp else 48.dp),
+                        onClick = { prepareForSfttv() },
+                        enabled = picked.isNotEmpty() && !sending && !externalBusy && !isTv,
+                        modifier = Modifier.fillMaxWidth().height(if (isTv) 58.dp else 50.dp),
                     ) {
-                        Icon(Icons.Filled.Share, null)
+                        if (externalBusy) CircularProgressIndicator(Modifier.size(19.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.Filled.Tv, null)
                         Spacer(Modifier.width(9.dp))
-                        Text("Diğer uygulamayla paylaş", fontWeight = FontWeight.SemiBold)
+                        Text(if (externalBusy) "SFTTV için hazırlanıyor…" else "Send Files to TV ile gönder", fontWeight = FontWeight.SemiBold)
                     }
                     Text(
-                        "Paylaşım listesinde Send Files to TV görünüyorsa seçerek dosyayı o uygulamaya aktarabilirsin.",
+                        "Seçtiğin dosyalar İndirilenler/FileBeam klasörüne kopyalanır ve SFTTV açılır. SFTTV'de GÖNDER, televizyonda AL seçeneğini kullan.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { shareWithOtherApps() },
+                        enabled = picked.isNotEmpty() && !sending && !externalBusy,
+                        modifier = Modifier.fillMaxWidth().height(if (isTv) 56.dp else 46.dp),
+                    ) {
+                        Icon(Icons.Filled.Share, null)
+                        Spacer(Modifier.width(9.dp))
+                        Text("Diğer uygulamalarla paylaş", fontWeight = FontWeight.SemiBold)
+                    }
+                    if (externalMessage != null) {
+                        Text(externalMessage!!, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
             if (progress != null) {

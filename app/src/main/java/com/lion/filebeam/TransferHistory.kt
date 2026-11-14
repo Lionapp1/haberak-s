@@ -42,7 +42,7 @@ object TransferHistory {
 
     @Synchronized
     fun record(context: Context, name: String, uri: Uri, size: Long) {
-        val items = (list(context) + TransferHistoryEntry(name, uri.toString(), size, System.currentTimeMillis())).take(500)
+        val items = list(context) + TransferHistoryEntry(name, uri.toString(), size, System.currentTimeMillis())
         val array = JSONArray()
         items.forEach { entry ->
             array.put(JSONObject().apply {

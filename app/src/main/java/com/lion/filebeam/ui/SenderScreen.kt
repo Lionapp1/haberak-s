@@ -112,12 +112,20 @@ fun SenderScreen(onBack: () -> Unit) {
                         )?.use { cursor ->
                             if (cursor.moveToFirst()) cursor.getString(0) else null
                         } ?: "dosya_${index + 1}"
-                        val safeName = originalName.substringAfterLast('/').substringAfterLast('\\')
-                            .replace("/", "_").replace("\\", "_").replace(":", "_")
-                            .replace("*", "_").replace("?", "_").replace("\"", "_")
-                            .replace("<", "_").replace(">", "_").replace("|", "_")
+                        val safeName = originalName
+                            .substringAfterLast('/')
+                            .map { character ->
+                                if (character.isLetterOrDigit() || character == '.' || character == '-' || character == '_') {
+                                    character
+                                } else {
+                                    '_'
+                                }
+                            }
+                            .joinToString("")
+                            .take(180)
+                            .ifBlank { "file_" + (index + 1) }
                         val values = ContentValues().apply {
-                            put(MediaStore.MediaColumns.DISPLAY_NAME, "${System.currentTimeMillis()}_${safeName}")
+                            put(MediaStore.MediaColumns.DISPLAY_NAME, System.currentTimeMillis().toString() + "_" + (index + 1) + "_" + safeName)
                             put(MediaStore.MediaColumns.MIME_TYPE, context.contentResolver.getType(uri) ?: "application/octet-stream")
                             put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/FileBeam")
                             put(MediaStore.MediaColumns.IS_PENDING, 1)

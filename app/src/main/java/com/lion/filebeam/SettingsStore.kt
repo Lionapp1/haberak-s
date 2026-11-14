@@ -57,6 +57,17 @@ object SettingsStore {
             ?.takeIf { prefs.getString(PAIRED_TRANSFER_IP, null) == ip }
     }
 
+    fun savedTransferIp(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PAIRED_TRANSFER_IP, "") ?: ""
+
+    fun savedTransferPin(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PAIRED_TRANSFER_PIN, "") ?: ""
+
+    fun clearTransferPair(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .remove(PAIRED_TRANSFER_IP).remove(PAIRED_TRANSFER_PIN).apply()
+    }
+
     fun saveMirrorPair(context: Context, ip: String, pin: String) {
         if (ip.isBlank() || pin.length != 6 || !pin.all(Char::isDigit)) return
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()

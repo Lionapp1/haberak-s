@@ -276,7 +276,7 @@ fun SenderScreen(onBack: () -> Unit) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text("Nereye gönderelim?", fontSize = if (isTv) 27.sp else 21.sp, fontWeight = FontWeight.Bold)
-                    Text("Aynı Wi-Fi ağına bağlı cihazlar otomatik görünür.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = if (isTv) 17.sp else 13.sp)
+                    Text("Aynı Wi-Fi'daki FileBeam cihazları otomatik bulunur. Eşleştirilmiş TV'ye dosya seçtiğinde gönderim kendiliğinden başlar.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = if (isTv) 17.sp else 13.sp)
                 }
             }
             item {
@@ -359,13 +359,13 @@ fun SenderScreen(onBack: () -> Unit) {
                 SectionCard {
                     Text("Gönderilecek dosyalar", fontWeight = FontWeight.SemiBold, fontSize = if (isTv) 20.sp else 16.sp)
                     Spacer(Modifier.height(5.dp))
-                    Text(if (picked.isEmpty()) "Henüz dosya seçilmedi." else "${picked.size} dosya seçildi", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = if (isTv) 17.sp else 13.sp)
+                    Text(if (picked.isEmpty()) "Henüz dosya seçilmedi." else "${picked.size} dosya seçildi · ${if (selected?.pin?.length == 6) "eşleşmiş cihaza otomatik gönderim hazır" else "cihaz eşleşmesi bekleniyor"}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = if (isTv) 17.sp else 13.sp)
                     Spacer(Modifier.height(12.dp))
                     OutlinedButton(
                         onClick = { picker.launch(arrayOf("*/*")) },
                         enabled = !sending && !externalBusy,
                         modifier = Modifier.fillMaxWidth().height(if (isTv) 62.dp else 50.dp),
-                    ) { Text(if (picked.isEmpty()) "Dosya seç" else "Dosyaları değiştir") }
+                    ) { Text(if (picked.isEmpty()) "Dosya seç · otomatik gönder" else "Dosyaları değiştir") }
                     Spacer(Modifier.height(9.dp))
                     Button(
                         onClick = { startSend() },

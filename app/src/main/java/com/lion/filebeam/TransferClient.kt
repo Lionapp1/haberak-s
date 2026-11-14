@@ -90,7 +90,7 @@ object TransferClient {
                 // prevents the receiver from waiting for any additional payload.
                 conn.shutdownOutput()
                 if (reader.readLine() != "DONE") throw IOException("TV dosyanın tamamlandığını onaylamadı")
-                TransferHistory.notifySent(context, name)
+                TransferHistory.recordSent(context, name, uri, if (size >= 0L) size else sentSizeFallback(uri, resolver))
                 onProgress(Progress(name, if (size >= 0L) size else 0L, size, 0L))
             } finally {
                 runCatching { source.close() }
@@ -98,6 +98,8 @@ object TransferClient {
             }
         }
     }
+
+    private fun sentSizeFallback(uri: Uri, resolver: ContentResolver): Long = querySize(resolver, uri).coerceAtLeast(0L)
 
     private fun queryName(resolver: ContentResolver, uri: Uri): String? =
         resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->

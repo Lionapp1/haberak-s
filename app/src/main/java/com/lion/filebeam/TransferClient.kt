@@ -90,6 +90,7 @@ object TransferClient {
                 // prevents the receiver from waiting for any additional payload.
                 conn.shutdownOutput()
                 if (reader.readLine() != "DONE") throw IOException("TV dosyanın tamamlandığını onaylamadı")
+                TransferHistory.notifySent(context, name)
                 onProgress(Progress(name, if (size >= 0L) size else 0L, size, 0L))
             } finally {
                 runCatching { source.close() }

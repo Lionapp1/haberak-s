@@ -101,13 +101,13 @@ fun UpdateScreen(onBack: () -> Unit) {
                                 downloading = true
                                 progress = 0
                                 error = null
-                                status = "Güncelleme indiriliyor…"
+                                status = "Güncelleme indiriliyor ve doğrulanıyor…"
                                 scope.launch {
                                     try {
                                         UpdateManager.downloadAndInstall(context, latest) { progress = it }
                                         status = "Kurulum ekranı açıldı."
                                     } catch (e: InstallPermissionRequiredException) {
-                                        status = "Kurulum izni gerekiyor. İzni verdikten sonra tekrar İndir ve kur'a dokun."
+                                        status = "APK doğrulandı ve İndirilenler/FileBeam klasörüne kaydedildi. İzin verince aşağıdaki düğmeyle tekrar kur."
                                         error = e.message
                                     } catch (e: Exception) {
                                         error = e.message ?: "Güncelleme indirilemedi."
@@ -120,6 +120,22 @@ fun UpdateScreen(onBack: () -> Unit) {
                             enabled = release != null && !checking && !downloading,
                             modifier = Modifier.weight(1f),
                         ) { Text("İndir ve kur") }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val latest = release ?: return@OutlinedButton
+                            try {
+                                UpdateManager.installDownloadedApk(context, latest.version)
+                                status = "Android kurulum ekranı açıldı."
+                                error = null
+                            } catch (e: Exception) {
+                                error = e.message ?: "İndirilen APK açılamadı."
+                            }
+                        },
+                        enabled = release != null && !downloading,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("İndirilen APK'yı yeniden kur")
                     }
                 }
             }

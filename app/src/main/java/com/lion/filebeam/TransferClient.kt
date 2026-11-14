@@ -56,6 +56,7 @@ object TransferClient {
                     else -> throw IOException("TV bağlantıyı reddetti")
                 }
 
+                var transferredBytes = 0L
                 source.use { input ->
                     val buffer = ByteArray(64 * 1024)
                     var sent = 0L
@@ -76,6 +77,7 @@ object TransferClient {
                         if (count == 0) continue
                         out.write(buffer, 0, count)
                         sent += count
+                        transferredBytes = sent
                         val now = System.currentTimeMillis()
                         if (now - lastTime >= 300) {
                             onProgress(Progress(name, sent, size, (sent - lastBytes) * 1000 / (now - lastTime)))
@@ -90,7 +92,7 @@ object TransferClient {
                 // prevents the receiver from waiting for any additional payload.
                 conn.shutdownOutput()
                 if (reader.readLine() != "DONE") throw IOException("TV dosyanın tamamlandığını onaylamadı")
-                TransferHistory.recordSent(context, name, uri, if (size >= 0L) size else sentSizeFallback(uri, resolver))
+                TransferHistory.recordSent(context, name, uri, if (size >= 0L) size else transferredBytes)
                 onProgress(Progress(name, if (size >= 0L) size else 0L, size, 0L))
             } finally {
                 runCatching { source.close() }
@@ -98,8 +100,6 @@ object TransferClient {
             }
         }
     }
-
-    private fun sentSizeFallback(uri: Uri, resolver: ContentResolver): Long = querySize(resolver, uri).coerceAtLeast(0L)
 
     private fun queryName(resolver: ContentResolver, uri: Uri): String? =
         resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->

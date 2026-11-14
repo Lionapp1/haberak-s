@@ -84,7 +84,7 @@ fun SenderScreen(onBack: () -> Unit) {
         }
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
-        if (it.isNotEmpty()) picked = it
+        if (it.isNotEmpty()) { picked = it; externalMessage = null }
     }
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         result.contents?.let { c ->
@@ -127,9 +127,11 @@ fun SenderScreen(onBack: () -> Unit) {
                         try {
                             val input = context.contentResolver.openInputStream(uri)
                                 ?: error("Seçilen dosya okunamadı: $originalName")
-                            val output = context.contentResolver.openOutputStream(target, "w")
-                                ?: error("Hedef dosya yazılamadı: $originalName")
-                            input.use { source -> output.use { destination -> source.copyTo(destination, 128 * 1024) } }
+                            input.use { source ->
+                                val output = context.contentResolver.openOutputStream(target, "w")
+                                    ?: error("Hedef dosya yazılamadı: $originalName")
+                                output.use { destination -> source.copyTo(destination, 128 * 1024) }
+                            }
                             context.contentResolver.update(target, ContentValues().apply {
                                 put(MediaStore.MediaColumns.IS_PENDING, 0)
                             }, null, null)
@@ -335,7 +337,7 @@ fun SenderScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(12.dp))
                     OutlinedButton(
                         onClick = { picker.launch(arrayOf("*/*")) },
-                        enabled = !sending,
+                        enabled = !sending && !externalBusy,
                         modifier = Modifier.fillMaxWidth().height(if (isTv) 62.dp else 50.dp),
                     ) { Text(if (picked.isEmpty()) "Dosya seç" else "Dosyaları değiştir") }
                     Spacer(Modifier.height(9.dp))
@@ -359,7 +361,7 @@ fun SenderScreen(onBack: () -> Unit) {
                         if (externalBusy) CircularProgressIndicator(Modifier.size(19.dp), strokeWidth = 2.dp)
                         else Icon(Icons.Filled.Tv, null)
                         Spacer(Modifier.width(9.dp))
-                        Text(if (externalBusy) "SFTTV için hazırlanıyor…" else "Send Files to TV ile gönder", fontWeight = FontWeight.SemiBold)
+                        Text(if (externalBusy) "SFTTV için hazırlanıyor…" else "SFTTV için hazırla ve aç", fontWeight = FontWeight.SemiBold)
                     }
                     Text(
                         "Seçtiğin dosyalar İndirilenler/FileBeam klasörüne kopyalanır ve SFTTV açılır. SFTTV'de GÖNDER, televizyonda AL seçeneğini kullan.",

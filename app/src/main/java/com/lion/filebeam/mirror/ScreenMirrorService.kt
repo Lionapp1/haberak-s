@@ -8,6 +8,9 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.AudioPlaybackCaptureConfiguration
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
@@ -31,6 +34,7 @@ class ScreenMirrorService : Service() {
     private var projectionCallback: MediaProjection.Callback? = null
     @Volatile private var running = false
     @Volatile private var socket: Socket? = null
+    @Volatile private var audioRecord: AudioRecord? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -95,13 +99,11 @@ class ScreenMirrorService : Service() {
         val metrics = DisplayMetrics()
         @Suppress("DEPRECATION")
         (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
-        // 720p-first keeps the stream compatible with older Android TV decoders.
-        val maxDimension = if (profile == "economy") 960f else 1280f
-        val scale = minOf(1f, maxDimension / maxOf(metrics.widthPixels, metrics.heightPixels))
-        val width = ((metrics.widthPixels * scale).toInt().coerceAtLeast(2) / 2) * 2
-        val height = ((metrics.heightPixels * scale).toInt().coerceAtLeast(2) / 2) * 2
+        // Fixed 16:9 landscape output for TV panels.
+        val width = if (profile == "economy") 1280 else 1920
+        val height = if (profile == "economy") 720 else 1080
         val fps = if (profile == "economy") 24 else 30
-        val bitrate = if (profile == "economy") 1_200_000 else 2_800_000
+        val bitrate = if (profile == "economy") 2_500_000 else 6_000_000
 
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
@@ -125,7 +127,8 @@ class ScreenMirrorService : Service() {
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, inputSurface, null, null
         ) ?: error("Sanal ekran oluşturulamadı")
 
-        publishStatus("Görüntü TV'ye aktarılıyor · ${width}×${height}")
+        val audioStarted = startAudioCapture(projection!!, out)
+        publishStatus(if (audioStarted) "Görüntü ve uygulama sesi aktarılıyor · ${width}×${height}" else "Görüntü aktarılıyor · ${width}×${height} · Ses izni yok veya uygulama sesi engelliyor")
         val info = MediaCodec.BufferInfo()
         var sentFormat = false
         while (running) {
@@ -135,14 +138,16 @@ class ScreenMirrorService : Service() {
                     val sps = outputFormat.getByteBuffer("csd-0")?.copyBytes() ?: ByteArray(0)
                     val pps = outputFormat.getByteBuffer("csd-1")?.copyBytes() ?: ByteArray(0)
                     check(sps.isNotEmpty() && pps.isNotEmpty()) { "H.264 kodlayıcı SPS/PPS bilgisi üretmedi" }
-                    out.writeInt(MAGIC)
-                    out.writeInt(width)
-                    out.writeInt(height)
-                    out.writeInt(sps.size)
-                    out.write(sps)
-                    out.writeInt(pps.size)
-                    out.write(pps)
-                    out.flush()
+                    synchronized(out) {
+                        out.writeInt(MAGIC)
+                        out.writeInt(width)
+                        out.writeInt(height)
+                        out.writeInt(sps.size)
+                        out.write(sps)
+                        out.writeInt(pps.size)
+                        out.write(pps)
+                        out.flush()
+                    }
                     sentFormat = true
                 }
                 MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
@@ -155,11 +160,14 @@ class ScreenMirrorService : Service() {
                             buffer.position(info.offset)
                             buffer.limit(info.offset + info.size)
                             buffer.get(bytes)
-                            out.writeInt(bytes.size)
-                            out.writeInt(info.flags)
-                            out.writeLong(info.presentationTimeUs)
-                            out.write(bytes)
-                            out.flush()
+                            synchronized(out) {
+                                out.writeInt(PACKET_VIDEO)
+                                out.writeInt(bytes.size)
+                                out.writeInt(info.flags)
+                                out.writeLong(info.presentationTimeUs)
+                                out.write(bytes)
+                                out.flush()
+                            }
                         }
                     } finally {
                         codec.releaseOutputBuffer(index, false)
@@ -169,6 +177,35 @@ class ScreenMirrorService : Service() {
         }
     }
 
+    private fun startAudioCapture(mediaProjection: MediaProjection, out: DataOutputStream): Boolean {
+        if (Build.VERSION.SDK_INT < 29 || checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) return false
+        return try {
+            val rate = 48000
+            val mask = AudioFormat.CHANNEL_IN_STEREO
+            val encoding = AudioFormat.ENCODING_PCM_16BIT
+            val minBuffer = AudioRecord.getMinBufferSize(rate, mask, encoding)
+            if (minBuffer <= 0) return false
+            val capture = AudioPlaybackCaptureConfiguration.Builder(mediaProjection)
+                .addMatchingUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                .addMatchingUsage(android.media.AudioAttributes.USAGE_GAME).build()
+            val record = AudioRecord.Builder().setAudioPlaybackCaptureConfig(capture)
+                .setAudioFormat(AudioFormat.Builder().setSampleRate(rate).setChannelMask(mask).setEncoding(encoding).build())
+                .setBufferSizeInBytes(maxOf(minBuffer * 2, 16384)).build()
+            if (record.state != AudioRecord.STATE_INITIALIZED) { record.release(); return false }
+            audioRecord = record
+            synchronized(out) { out.writeInt(PACKET_AUDIO_CONFIG); out.writeInt(rate); out.writeInt(2); out.writeInt(encoding); out.flush() }
+            record.startRecording()
+            thread(name = "FileBeam-mirror-audio") {
+                val pcm = ByteArray(maxOf(minBuffer, 8192))
+                while (running && audioRecord === record) {
+                    val count = record.read(pcm, 0, pcm.size)
+                    if (count > 0) synchronized(out) { out.writeInt(PACKET_AUDIO); out.writeInt(count); out.write(pcm, 0, count); out.flush() }
+                    else if (count < 0) break
+                }
+            }
+            true
+        } catch (_: Exception) { runCatching { audioRecord?.release() }; audioRecord = null; false }
+    }
     private fun ByteBuffer.copyBytes(): ByteArray {
         val copy = duplicate()
         val bytes = ByteArray(copy.remaining())
@@ -185,6 +222,9 @@ class ScreenMirrorService : Service() {
 
     private fun stopMirror() {
         running = false
+        runCatching { audioRecord?.stop() }
+        runCatching { audioRecord?.release() }
+        audioRecord = null
         runCatching { socket?.close() }
         socket = null
         runCatching { virtualDisplay?.release() }
@@ -229,6 +269,9 @@ class ScreenMirrorService : Service() {
         const val EXTRA_PIN = "pin"
         const val EXTRA_PROFILE = "profile"
         private const val NOTIFICATION_ID = 47814
-        private const val MAGIC = 0x46424D31
+        private const val MAGIC = 0x46424D32
+        private const val PACKET_VIDEO = 1
+        private const val PACKET_AUDIO_CONFIG = 2
+        private const val PACKET_AUDIO = 3
     }
 }

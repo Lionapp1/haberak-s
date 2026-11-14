@@ -86,7 +86,7 @@ object UpdateManager {
         val apkFile = File(target, "FileBeam-${release.version}.apk")
         download(release.apkUrl, apkFile, onProgress)
         release.checksumUrl?.let { checksumUrl ->
-            val expected = readText(checksumUrl).trim().substringBefore(Regex("\\s")).lowercase()
+            val expected = readText(checksumUrl).trim().split(Regex("\\s+"), limit = 2).firstOrNull().orEmpty().lowercase()
             if (!expected.matches(Regex("[a-f0-9]{64}"))) {
                 apkFile.delete()
                 throw IllegalStateException("Release SHA-256 dosyası hatalı.")

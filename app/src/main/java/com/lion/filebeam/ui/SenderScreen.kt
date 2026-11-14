@@ -229,7 +229,7 @@ fun SenderScreen(onBack: () -> Unit) {
         doneMsg = null
         scope.launch {
             try {
-                TransferClient.send(context, dev.ip, dev.port, dev.pin.ifBlank { manualPin }, picked) { p ->
+                TransferClient.send(context, dev.ip, dev.port, dev.pin, picked) { p ->
                     scope.launch { progress = p }
                 }
                 doneMsg = picked.size.toString() + " dosya başarıyla gönderildi"
@@ -305,7 +305,13 @@ fun SenderScreen(onBack: () -> Unit) {
                         devices.forEach { d ->
                             val active = selected?.ip == d.ip
                             Surface(
-                                onClick = { selected = d; error = null; doneMsg = null },
+                                onClick = {
+                                    selected = d
+                                    manualIp = d.ip
+                                    manualPin = SettingsStore.transferPinFor(context, d.ip).orEmpty()
+                                    error = null
+                                    doneMsg = null
+                                },
                                 shape = RoundedCornerShape(14.dp),
                                 color = if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -367,7 +373,7 @@ fun SenderScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(
                         onClick = {
-                            if (manualIp.isNotBlank() && manualPin.length == 6) {
+                            if (isValidIpv4(manualIp.trim()) && manualPin.length == 6) {
                                 val cleanIp = manualIp.trim()
                                 SettingsStore.saveTransferPair(context, cleanIp, manualPin)
                                 manualIp = cleanIp
@@ -376,7 +382,7 @@ fun SenderScreen(onBack: () -> Unit) {
                                 doneMsg = null
                             }
                         },
-                        enabled = manualIp.isNotBlank() && manualPin.length == 6,
+                        enabled = isValidIpv4(manualIp.trim()) && manualPin.length == 6,
                         modifier = Modifier.fillMaxWidth().height(if (isTv) 58.dp else 46.dp),
                     ) { Text(if (selected?.ip == manualIp.trim() && selected?.pin == manualPin) "Bağlantıyı güncelle" else "Cihazı kaydet ve bağlan") }
                     if (SettingsStore.savedTransferIp(context).isNotBlank()) {
@@ -407,7 +413,7 @@ fun SenderScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(9.dp))
                     Button(
                         onClick = { startSend() },
-                        enabled = !sending && selected != null && picked.isNotEmpty() && (selected?.pin?.length == 6 || manualPin.length == 6),
+                        enabled = !sending && selected?.pin?.length == 6 && picked.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth().height(if (isTv) 68.dp else 52.dp),
                         shape = RoundedCornerShape(14.dp),
                     ) {
@@ -490,5 +496,14 @@ private fun StatusMessage(message: String, isError: Boolean) {
             color = if (isError) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
             fontSize = 13.sp,
         )
+    }
+}
+
+
+private fun isValidIpv4(value: String): Boolean {
+    val parts = value.split(".")
+    return parts.size == 4 && parts.all { part ->
+        part.isNotEmpty() && part.length <= 3 && part.all(Char::isDigit) &&
+            part.toIntOrNull()?.let { it in 0..255 } == true
     }
 }

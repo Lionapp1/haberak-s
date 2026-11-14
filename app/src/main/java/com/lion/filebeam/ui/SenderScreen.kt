@@ -41,6 +41,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.lion.filebeam.Discovery
 import com.lion.filebeam.TransferClient
+import com.lion.filebeam.SettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -58,6 +59,7 @@ fun SenderScreen(onBack: () -> Unit) {
     var progress by remember { mutableStateOf<TransferClient.Progress?>(null) }
     var sending by remember { mutableStateOf(false) }
     var externalBusy by remember { mutableStateOf(false) }
+    var autoSendPending by remember { mutableStateOf(false) }
     var externalMessage by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var doneMsg by remember { mutableStateOf<String?>(null) }
@@ -68,9 +70,12 @@ fun SenderScreen(onBack: () -> Unit) {
     DisposableEffect(Unit) {
         listenJob.value = scope.launch {
             Discovery.listen(context) { b ->
+                val pairedPin = SettingsStore.transferPinFor(context, b.ip)
+                val discovered = if (pairedPin != null) b.copy(pin = pairedPin) else b
                 val idx = devices.indexOfFirst { it.ip == b.ip }
-                if (idx >= 0) devices[idx] = b else devices.add(b)
-                if (selected?.ip == b.ip) selected = b
+                if (idx >= 0) devices[idx] = discovered else devices.add(discovered)
+                if (selected?.ip == b.ip) selected = discovered.copy(pin = selected?.pin?.takeIf { it.length == 6 } ?: discovered.pin)
+                if (selected == null && pairedPin != null) selected = discovered
             }
         }
         onDispose { listenJob.value?.cancel() }
@@ -84,11 +89,16 @@ fun SenderScreen(onBack: () -> Unit) {
         }
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
-        if (it.isNotEmpty()) { picked = it; externalMessage = null }
+        if (it.isNotEmpty()) {
+            picked = it
+            externalMessage = null
+            autoSendPending = true
+        }
     }
     val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         result.contents?.let { c ->
             Regex("filebeam://([0-9.]+):([0-9]+)#([0-9]+)").find(c)?.let { m ->
+                SettingsStore.saveTransferPair(context, m.groupValues[1], m.groupValues[3])
                 selected = Discovery.Beacon("QR ile bağlanıldı", m.groupValues[1], m.groupValues[2].toInt(), m.groupValues[3])
                 error = null
                 doneMsg = null
@@ -222,6 +232,13 @@ fun SenderScreen(onBack: () -> Unit) {
         }
     }
 
+    LaunchedEffect(autoSendPending, picked, selected, sending) {
+        if (autoSendPending && picked.isNotEmpty() && selected?.pin?.length == 6 && !sending) {
+            autoSendPending = false
+            startSend()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -327,6 +344,7 @@ fun SenderScreen(onBack: () -> Unit) {
                     OutlinedButton(
                         onClick = {
                             if (manualIp.isNotBlank() && manualPin.length == 6) {
+                                SettingsStore.saveTransferPair(context, manualIp.trim(), manualPin)
                                 selected = Discovery.Beacon("Manuel bağlantı", manualIp.trim(), 47813, manualPin)
                                 error = null
                                 doneMsg = null

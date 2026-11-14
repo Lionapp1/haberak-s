@@ -9,7 +9,6 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.core.content.FileProvider
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items

@@ -113,7 +113,9 @@ fun SenderScreen(onBack: () -> Unit) {
                             if (cursor.moveToFirst()) cursor.getString(0) else null
                         } ?: "dosya_${index + 1}"
                         val safeName = originalName.substringAfterLast('/').substringAfterLast('\\')
-                            .replace(Regex("[\\\\/:*?\\"<>|]"), "_")
+                            .replace("/", "_").replace("\\", "_").replace(":", "_")
+                            .replace("*", "_").replace("?", "_").replace("\"", "_")
+                            .replace("<", "_").replace(">", "_").replace("|", "_")
                         val values = ContentValues().apply {
                             put(MediaStore.MediaColumns.DISPLAY_NAME, "${System.currentTimeMillis()}_${safeName}")
                             put(MediaStore.MediaColumns.MIME_TYPE, context.contentResolver.getType(uri) ?: "application/octet-stream")

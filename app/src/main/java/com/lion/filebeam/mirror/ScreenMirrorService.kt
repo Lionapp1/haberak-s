@@ -44,6 +44,7 @@ class ScreenMirrorService : Service() {
             else @Suppress("DEPRECATION") (intent?.getParcelableExtra(EXTRA_DATA) as? Intent)
         val host = intent?.getStringExtra(EXTRA_HOST).orEmpty()
         val pin = intent?.getStringExtra(EXTRA_PIN).orEmpty()
+        val profile = intent?.getStringExtra(EXTRA_PROFILE) ?: "balanced"
         if (data == null || host.isBlank() || pin.length != 6) {
             stopSelf()
             return START_NOT_STICKY
@@ -55,7 +56,7 @@ class ScreenMirrorService : Service() {
         }
         thread(name = "FileBeam-mirror-encoder") {
             try {
-                startMirror(resultCode, data, host, pin)
+                startMirror(resultCode, data, host, pin, profile)
             } catch (_: Exception) {
                 stopMirror()
                 stopSelf()
@@ -64,7 +65,7 @@ class ScreenMirrorService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun startMirror(resultCode: Int, data: Intent, host: String, pin: String) {
+    private fun startMirror(resultCode: Int, data: Intent, host: String, pin: String, profile: String) {
         val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         projection = manager.getMediaProjection(resultCode, data)
         projectionCallback = object : MediaProjection.Callback() {
@@ -74,14 +75,15 @@ class ScreenMirrorService : Service() {
         val metrics = DisplayMetrics()
         @Suppress("DEPRECATION")
         (getSystemService(WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
-        val scale = minOf(1f, 1280f / maxOf(metrics.widthPixels, metrics.heightPixels))
+        val maxDimension = if (profile == "economy") 1280f else 1920f
+        val scale = minOf(1f, maxDimension / maxOf(metrics.widthPixels, metrics.heightPixels))
         val width = (metrics.widthPixels * scale).toInt().coerceAtLeast(2) / 2 * 2
         val height = (metrics.heightPixels * scale).toInt().coerceAtLeast(2) / 2 * 2
 
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, 2_800_000)
-            setInteger(MediaFormat.KEY_FRAME_RATE, 30)
+            setInteger(MediaFormat.KEY_BIT_RATE, if (profile == "economy") 1_600_000 else 4_500_000)
+            setInteger(MediaFormat.KEY_FRAME_RATE, if (profile == "economy") 24 else 30)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 2)
             if (Build.VERSION.SDK_INT >= 29) setInteger(MediaFormat.KEY_LATENCY, 1)
         }
@@ -188,6 +190,7 @@ class ScreenMirrorService : Service() {
         const val EXTRA_DATA = "projection_data"
         const val EXTRA_HOST = "host"
         const val EXTRA_PIN = "pin"
+        const val EXTRA_PROFILE = "profile"
         private const val NOTIFICATION_ID = 47814
         private const val MAGIC = 0x46424D31
     }
